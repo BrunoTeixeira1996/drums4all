@@ -18,14 +18,6 @@ drums4all only exists because I wanted a metronome and a few practice tools on t
 
 ## Using it (no technical knowledge needed)
 
-### Option 1: online
-
-If this project is published on GitHub Pages, just open its link (something like
-`https://<username>.github.io/drums4all/`). Nothing to install. Your tabs are saved **in your browser**, so use
-**Export .txt** now and then to keep a copy.
-
-### Option 2: on your computer
-
 1. **Get the files.** On the GitHub page, click **Code → Download ZIP** and unzip it somewhere (e.g. your Desktop).
 2. **Install Python 3** (only once) from <https://www.python.org/downloads/>.
    On Windows, tick **"Add python.exe to PATH"** at the start of the installer.
@@ -131,9 +123,22 @@ python3 -m venv .venv
 - `static/kits/`: drum samples (FLAC) and `kits.json`, built by `tools/build_kits.py` (needs ffmpeg and numpy)
   from [Hydrogen](http://hydrogen-music.org/) drumkits.
 - `static/vendor/`: VexFlow, jsPDF and svg2pdf.js, kept locally so it works offline.
-- `.github/workflows/pages.yml`: publishes the app to GitHub Pages on every push to `main`
-  (enable it once in **Settings → Pages → Source: GitHub Actions**).
 - `start.sh`, `start.command`, `start.bat`: one-click launchers (create `.venv`, install, run `app.py --open`).
+
+### Hosting your own copy online
+
+drums4all also works as a plain static site, without `app.py`: then each visitor's tabs are saved in their own
+browser (the page starts with the examples). To put it on any static host (GitHub Pages on your fork, Netlify,
+your own server...), publish `static/index.html` as the site's `index.html` next to the `static/` folder:
+
+```sh
+mkdir site
+cp static/index.html site/index.html
+cp -r static site/static
+# upload the contents of site/ (on GitHub Pages, also add an empty site/.nojekyll)
+```
+
+All paths in the page are relative, so it also works from a sub-folder like `https://<user>.github.io/drums4all/`.
 
 ### Third-party material
 

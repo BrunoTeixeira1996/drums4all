@@ -11,7 +11,9 @@ comments, examples and docs is in English**.
   doesn't exist yet; the user will create it.
 - Don't touch the user's tabs in `tabs/` unless asked (it's their data and it's git-ignored). Back them up first if
   you must change them.
-- Keep the app working both **with the Flask server** and **as a static site** (GitHub Pages, tabs in localStorage).
+- Keep the app working both **with the Flask server** and **as a static site** (any static host, tabs in
+  localStorage). The user does **not** want to publish it from this repo (no GitHub Pages workflow); the README
+  only explains how others can host their own copy.
   Use relative URLs in the page (`static/...`, `api/tabs`), never absolute ones.
 
 ## Run and test
@@ -43,7 +45,6 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - `start.sh` / `start.command` / `start.bat`: double-click launchers for non-technical users
   (create `.venv`, `pip install -r requirements.txt`, `app.py --open`). The `.bat` and `.command` were never run on
   real Windows/macOS.
-- `.github/workflows/pages.yml`: publishes `static/` to GitHub Pages on push to `main`.
 - `docs/screenshots/`: README images (1440×900 headless Chrome: `funk` example playing, note picker on the snare,
   `rudiments` sheet). Retake them after visible UI changes.
 
@@ -78,4 +79,4 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - Triplets/subdivision per beat (today it's per bar).
 - Rimshot vs accent look the same on the snare in the sheet (both x + `>`), on purpose like drumtabs.
 - Pearl/Tama kits have no fully open hi-hat sample (semi-open is used) and one rack tom (tom 2 is it pitched down).
-- Launchers untested on Windows/macOS; GitHub Pages not tried for real yet.
+- Launchers untested on Windows/macOS; static hosting only tested locally (sub-folder served by `http.server`).
