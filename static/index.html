@@ -77,6 +77,12 @@
   #practice.left { color: var(--niagara); }
   #practice.done { color: var(--red1); border-color: var(--red); }
   #timer, #reps { width: 58px; text-align: center; }
+  #reps-left {
+    display: none; padding: 3px 8px; border: 1px solid var(--niagara-1); border-radius: 3px;
+    color: var(--niagara); font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  #reps-left.show { display: inline-block; }
+  #reps-left.done { color: var(--red1); border-color: var(--red); }
   #today { color: var(--niagara-1); font-size: 12px; }
   #clear-sel { display: none; }
   #clear-sel.show { display: inline-block; }
@@ -133,6 +139,7 @@
   .legend dt { color: var(--niagara); min-width: 22px; }
   .legend dt.acc { color: var(--brown); }
   .legend dt.ghost { color: var(--wisteria); }
+  .legend dt.stick { color: var(--quartz); }
   .legend dd { margin: 0; }
   .legend h4 { margin: 0 0 4px; font-size: 11px; font-weight: 400; color: var(--niagara-1); }
   #sheet-key { border-top: 1px solid #e2e2e2; margin-top: 10px; padding-top: 6px; }
@@ -166,6 +173,7 @@
     <button id="t-loop" class="on" title="L">Loop</button>
     <label class="field" title="Play the tab (or the loop range) this many times, then stop. Empty = no limit">×
       <input id="reps" type="number" min="0" max="999" step="1" placeholder="∞"></label>
+    <span id="reps-left" title="Repetitions still to play, counting the one playing now"></span>
     <button id="t-ramp" title="R">Speed up</button>
     <span id="ramp-cfg">+<input id="ramp-step" type="number" min="1" max="20" value="2"> BPM every
       <input id="ramp-every" type="number" min="1" max="64" value="4"> loops up to
@@ -248,7 +256,7 @@
 <main>
   <section class="pane" id="grid-pane">
     <div class="hint">Click a cell and pick a note · or type <kbd>o</kbd> <kbd>O</kbd> <kbd>x</kbd> <kbd>X</kbd> <kbd>g</kbd> <kbd>f</kbd> <kbd>b</kbd>,
-      <kbd>-</kbd>/<kbd>Del</kbd> clears, arrows move · <b>Time</b> and <b>Subdivision</b> apply to the selected bar (e.g. one bar of 3/4, or triplets)
+      <kbd>-</kbd>/<kbd>Del</kbd> clears, arrows move · sticking on the <b>ST</b> row: <kbd>r</kbd> <kbd>l</kbd> <kbd>u</kbd> · <b>Time</b> and <b>Subdivision</b> apply to the selected bar (e.g. one bar of 3/4, or triplets)
       · click a bar number to loop it (<kbd>Shift</kbd> extends)</div>
     <div id="grid-wrap">
       <canvas id="grid" tabindex="0"></canvas>
@@ -266,6 +274,7 @@
         <div><dt>S</dt><dd>snare</dd></div>
         <div><dt>FT</dt><dd>floor tom</dd></div>
         <div><dt>B</dt><dd>bass drum (kick)</dd></div>
+        <div><dt class="stick">ST</dt><dd>sticking: R, L, U = both</dd></div>
       </dl>
       <h4>symbols</h4>
       <dl>
@@ -313,10 +322,12 @@ HH|-x-x-x-x|x-x-x-x-|
 // ---------------------------------------------------------------- tab model
 // song = { title, tempo, beats, unit, insts: [...], bars: [{ steps, beats, unit, notes: { inst: "o--x" }, lineBreak }] }
 // Each bar has its own time signature and one step count shared by all its instruments; rests are "-".
+// bar.sticking (optional) has the same length: R, L, U (unison, both hands) or "-", from an "ST|" row.
 // song.beats/unit is the default (the "Time:" header).
 
 const REST = new Set("-.·_");
 const NOTE = new Set("oOxXgGfFbB");
+const STICK = new Set("RLU");
 const INSTRUMENTS = {
   C: ["C", "CC", "CR", "CRASH"],
   R: ["R", "RD", "RC", "RIDE"],
@@ -357,7 +368,7 @@ function parse(text) {
   let block = null;
   let sig = null;  // time signature for the next blocks, set by "Time:" lines
   const newBlock = () => {
-    block = { rows: {}, ts: null, sig: sig || [song.beats, song.unit] };
+    block = { rows: {}, ts: null, st: null, sig: sig || [song.beats, song.unit] };
     blocks.push(block);
   };
   text.split("\n").forEach((raw, idx) => {
@@ -401,6 +412,19 @@ function parse(text) {
       return;
     }
 
+    // "ST|RLRR|": sticking under the notes.
+    if (name.toUpperCase() === "ST") {
+      if (!block) newBlock();
+      block.st = parts.map(p => {
+        const sym = p.replace(/\s+/g, "").toUpperCase();
+        for (const ch of sym) {
+          if (!REST.has(ch) && !STICK.has(ch)) throw new TabError(`invalid sticking '${ch}' (use R, L or U)`, n);
+        }
+        return [...sym].map(ch => (REST.has(ch) ? "-" : ch)).join("");
+      });
+      return;
+    }
+
     const canon = ALIASES[name.toUpperCase()];
     if (!canon) throw new TabError(`unknown instrument '${name}'`, n);
     const bars = parts.map(p => {
@@ -417,16 +441,18 @@ function parse(text) {
 
   const used = new Set(blocks.flatMap(b => Object.keys(b.rows)));
   song.insts = ORDER.filter(i => BASE.includes(i) || used.has(i));
-  blocks.forEach(({ rows, ts, sig: blockSig }) => {
-    const count = Math.max(0, ...Object.values(rows).map(v => v.length), ts ? ts.length : 0);
+  blocks.forEach(({ rows, ts, st, sig: blockSig }) => {
+    const count = Math.max(0, ...Object.values(rows).map(v => v.length), ts ? ts.length : 0, st ? st.length : 0);
     for (let i = 0; i < count; i++) {
       const [beats, unit] = (ts && ts[i]) || blockSig;
-      const lens = Object.values(rows).map(v => (v[i] || "").length).filter(Boolean);
+      const lens = [...Object.values(rows), st || []].map(v => (v[i] || "").length).filter(Boolean);
       const steps = lens.length ? lens.reduce(lcm, 1) : beats * 2;
       if (steps > MAX_STEPS) throw new TabError(`bar ${song.bars.length + 1} mixes subdivisions that don't fit together`);
       const notes = {};
       for (const inst of song.insts) notes[inst] = stretch((rows[inst] || [])[i] || "", steps);
-      song.bars.push({ steps, beats, unit, notes, lineBreak: i === 0 && song.bars.length > 0 });
+      const bar = { steps, beats, unit, notes, lineBreak: i === 0 && song.bars.length > 0 };
+      if (st && /[^-]/.test(st[i] || "")) bar.sticking = stretch(st[i], steps);
+      song.bars.push(bar);
     }
   });
   if (!song.bars.length) throw new TabError("no bars found (lines like 'S|o-o-|')");
@@ -469,6 +495,9 @@ function serialize(song) {
       out.push("TS".padStart(w) + "|" + bars.map(b => sigOf(b).padEnd(b.steps)).join("|") + "|");
     }
     for (const inst of song.insts) out.push(inst.padStart(w) + "|" + bars.map(b => b.notes[inst]).join("|") + "|");
+    if (bars.some(b => b.sticking)) {
+      out.push("ST".padStart(w) + "|" + bars.map(b => b.sticking || "-".repeat(b.steps)).join("|") + "|");
+    }
     if (bars.every(b => b.beats < 10)) {
       out.push(" ".repeat(w + 1) + bars.map(b => countLabels(b.steps, b.beats).map(l => l || " ").join("").padEnd(Math.max(b.steps, sigOf(b).length))).join(" "));
     }
@@ -841,7 +870,7 @@ function renderControls() {
     missing.map(i => `<option value="${i}">${i} · ${INST_NAME[i]}</option>`).join("");
   add.disabled = S.textMode || !missing.length;
 
-  const inst = song.insts[S.cur.row];
+  const inst = gridRows(song)[S.cur.row];
   $("where").textContent = `bar ${S.cur.bar + 1} · ${sigOf(bar)} · ${inst} · step ${S.cur.step + 1}/${bar.steps}`;
 }
 
@@ -873,6 +902,7 @@ for (const [id, key] of [["ramp-step", "rampStep"], ["ramp-every", "rampEvery"],
 $("reps").addEventListener("change", e => {
   S.reps = Math.max(0, Math.min(999, Math.round(+e.target.value) || 0));
   e.target.value = S.reps || "";
+  if (!S.playing) R.rep = 0;  // clears a finished "done" 
   savePrefs();
 });
 // Sound choices are a per-browser preference.
@@ -946,7 +976,7 @@ function edit(fn, mergeKey = null) {
 function changed() {
   const song = S.song;
   S.cur.bar = Math.min(S.cur.bar, song.bars.length - 1);
-  S.cur.row = Math.min(S.cur.row, song.insts.length - 1);
+  S.cur.row = Math.min(S.cur.row, gridRows(song).length - 1);
   S.cur.step = Math.min(S.cur.step, song.bars[S.cur.bar].steps - 1);
   if (S.selection && S.selection[1] >= song.bars.length) S.selection = null;
   const tab = lib.tabs.find(t => t.id === lib.current);
@@ -984,21 +1014,29 @@ function redo() {
 }
 
 function curBar() { return S.song.bars[S.cur.bar]; }
-function curInst() { return S.song.insts[S.cur.row]; }
+// The grid shows the instruments plus a sticking row ("ST") under them.
+function gridRows(song) { return [...song.insts, "ST"]; }
+function rowOf(bar, name) { return name === "ST" ? bar.sticking || "-".repeat(bar.steps) : bar.notes[name]; }
+function setRow(bar, name, row) {
+  if (name !== "ST") bar.notes[name] = row;
+  else if (/[^-]/.test(row)) bar.sticking = row;
+  else delete bar.sticking;
+}
+function curInst() { return gridRows(S.song)[S.cur.row]; }
 
 function setNote(ch, advance) {
   const { bar: bi, step } = S.cur;
   const inst = curInst();
   edit(song => {
-    const row = song.bars[bi].notes[inst];
-    song.bars[bi].notes[inst] = row.slice(0, step) + ch + row.slice(step + 1);
+    const row = rowOf(song.bars[bi], inst);
+    setRow(song.bars[bi], inst, row.slice(0, step) + ch + row.slice(step + 1));
   });
   if (advance) moveCursor(1, 0);
 }
 
 function moveCursor(dx, dy) {
   const song = S.song, c = S.cur;
-  c.row = Math.max(0, Math.min(song.insts.length - 1, c.row + dy));
+  c.row = Math.max(0, Math.min(gridRows(song).length - 1, c.row + dy));
   c.step += dx;
   if (c.step >= song.bars[c.bar].steps) {
     if (c.bar < song.bars.length - 1) { c.bar++; c.step = 0; } else c.step = song.bars[c.bar].steps - 1;
@@ -1026,19 +1064,25 @@ function emptyLike(song, bar) {
   return { steps: bar.steps, beats: bar.beats, unit: bar.unit, notes, lineBreak: false };
 }
 
-function copyOf(bar) { return { steps: bar.steps, beats: bar.beats, unit: bar.unit, notes: { ...bar.notes }, lineBreak: false }; }
+function copyOf(bar) {
+  const copy = { steps: bar.steps, beats: bar.beats, unit: bar.unit, notes: { ...bar.notes }, lineBreak: false };
+  if (bar.sticking) copy.sticking = bar.sticking;
+  return copy;
+}
 
 // Change a bar's grid, keeping every note at its position in time when it fits.
 function resample(bar, steps) {
-  for (const inst of Object.keys(bar.notes)) {
+  const remap = row => {
     const out = Array(steps).fill("-");
-    [...bar.notes[inst]].forEach((ch, j) => {
+    [...row].forEach((ch, j) => {
       if (ch === "-") return;
       const k = Math.round((j * steps) / bar.steps);
       if (k < steps && out[k] === "-") out[k] = ch;
     });
-    bar.notes[inst] = out.join("");
-  }
+    return out.join("");
+  };
+  for (const inst of Object.keys(bar.notes)) bar.notes[inst] = remap(bar.notes[inst]);
+  if (bar.sticking) bar.sticking = remap(bar.sticking);
   bar.steps = steps;
 }
 
@@ -1048,6 +1092,7 @@ function setTimeSig(bar, beats, unit) {
   if (bar.steps % bar.beats) resample(bar, per * bar.beats);
   const steps = per * beats;
   for (const inst of Object.keys(bar.notes)) bar.notes[inst] = bar.notes[inst].slice(0, steps).padEnd(steps, "-");
+  if (bar.sticking) bar.sticking = bar.sticking.slice(0, steps).padEnd(steps, "-");
   Object.assign(bar, { steps, beats, unit });
 }
 
@@ -1082,6 +1127,7 @@ $("bar-del").addEventListener("click", deleteBar);
 $("bar-clear").addEventListener("click", () => edit(song => {
   const bar = song.bars[S.cur.bar];
   for (const inst of song.insts) bar.notes[inst] = "-".repeat(bar.steps);
+  delete bar.sticking;
 }));
 $("bar-break").addEventListener("click", () => edit(song => {
   const bar = song.bars[S.cur.bar];
@@ -1124,6 +1170,8 @@ function pasteBar() {
     const src = S.clipboard;
     Object.assign(bar, { steps: src.steps, beats: src.beats, unit: src.unit });
     for (const inst of song.insts) bar.notes[inst] = src.notes[inst] || "-".repeat(src.steps);
+    if (src.sticking) bar.sticking = src.sticking;
+    else delete bar.sticking;
   });
 }
 
@@ -1177,18 +1225,19 @@ const PICK = {
   R: [["x", "normal"], ["X", "accent"], ["b", "bell"], ["B", "bell acc."]],
   HF: [["x", "foot"], ["X", "accent"]],
   B: [["o", "normal"], ["O", "accent"]],
+  ST: [["R", "right"], ["L", "left"], ["U", "both"]],
 };
 const PICK_DEFAULT = [["o", "normal"], ["O", "accent"], ["g", "ghost"], ["f", "flam"]];
 const picker = $("picker");
 
 function openPicker(cell) {
   const inst = curInst();
-  const current = curBar().notes[inst][S.cur.step];
+  const current = rowOf(curBar(), inst)[S.cur.step];
   const opts = [...(PICK[inst] || PICK_DEFAULT), ["-", "rest"]];
-  picker.innerHTML = `<div class="title">${INST_NAME[inst]} · bar ${S.cur.bar + 1}, step ${S.cur.step + 1}</div>` +
+  picker.innerHTML = `<div class="title">${INST_NAME[inst] || "Sticking"} · bar ${S.cur.bar + 1}, step ${S.cur.step + 1}</div>` +
     opts.map(([ch, label]) =>
       `<button data-ch="${ch}" class="${ch === current ? "current" : ""}">` +
-      `<b class="${ch !== ch.toLowerCase() ? "acc" : ""}">${ch === "-" ? "·" : ch}</b><span>${label}</span></button>`).join("");
+      `<b class="${ch !== ch.toLowerCase() && inst !== "ST" ? "acc" : ""}">${ch === "-" ? "·" : ch}</b><span>${label}</span></button>`).join("");
   picker.classList.add("show");
   const wrap = $("grid-wrap");
   const left = Math.max(4, Math.min(cell.x - 10, wrap.clientWidth - picker.offsetWidth - 8));
@@ -1242,7 +1291,8 @@ document.addEventListener("keydown", e => {
   else if (grid && k === "End") { S.cur.step = curBar().steps - 1; moveCursor(0, 0); }
   else if (grid && k === "Delete") { setNote("-", false); closePicker(); }
   else if (grid && k === "Backspace") { setNote("-", false); moveCursor(-1, 0); }
-  else if (grid && (NOTE.has(k) || k === "-" || k === ".")) { setNote(REST.has(k) ? "-" : k, true); }
+  else if (grid && curInst() === "ST" && STICK.has(k.toUpperCase())) { setNote(k.toUpperCase(), true); }
+  else if (grid && ((NOTE.has(k) && curInst() !== "ST") || k === "-" || k === ".")) { setNote(REST.has(k) ? "-" : k, true); }
   else if (TOGGLE_KEYS[k.toLowerCase()] && !e.shiftKey) { actions[TOGGLE_KEYS[k.toLowerCase()]](); renderControls(); }
   else return;
   e.preventDefault();
@@ -1617,7 +1667,7 @@ function gridLayout(width) {
 function drawGrid(now) {
   const song = S.song;
   const W = gridWrap.clientWidth;
-  const insts = song.insts;
+  const insts = gridRows(song);
   const lineH = NUM_H + (insts.length + 1) * ROW_H + LINE_GAP;
   const lines = gridLayout(W);
   const H = Math.max(60, lines.length * lineH + 8);
@@ -1694,7 +1744,7 @@ function drawBar(bi, x, y, insts, frac) {
   const nowStep = frac !== null ? Math.floor(frac * bar.steps) : -1;
   const perBeat = bar.steps % bar.beats ? 0 : bar.steps / bar.beats;
   insts.forEach((inst, r) => {
-    const row = bar.notes[inst];
+    const row = rowOf(bar, inst);
     const cy = rowsY + r * ROW_H + ROW_H / 2;
     for (let j = 0; j < bar.steps; j++) {
       const ch = row[j];
@@ -1716,7 +1766,7 @@ function drawBar(bi, x, y, insts, frac) {
         g.beginPath(); g.arc(cx, cy, onBeat ? 2.2 : 1.8, 0, 2 * Math.PI); g.fill();
       } else {
         g.font = "15px " + MONO;
-        g.fillStyle = ch !== ch.toLowerCase() ? C.accent : ch === "g" ? C.ghost : C.note;
+        g.fillStyle = inst === "ST" ? C.label : ch !== ch.toLowerCase() ? C.accent : ch === "g" ? C.ghost : C.note;
         g.fillText(ch, cx, cy + 1);
       }
     }
@@ -1841,6 +1891,15 @@ function buildMeasure(song, bar) {
   const group = unit === 8 && beats % 3 === 0 ? 3 : 1;
   const insts = song.insts;
   const m = { voices: [], beams: [], tuplets: [], count: 0, graces: 0 };
+  // Sticking letter under the note, below the staff.
+  const stick = (note, step) => {
+    const ch = bar.sticking && bar.sticking[step];
+    if (ch && ch !== "-") {
+      note.addModifier(new VF.Annotation(ch).setFont("Arial", 11, "bold")
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM), 0);
+    }
+    return note;
+  };
 
   if (!insts.some(i => /[^-]/.test(bar.notes[i]))) {
     const rest = new VF.StaveNote({ keys: ["b/4"], duration: "wr", align_center: true });
@@ -1860,12 +1919,12 @@ function buildMeasure(song, bar) {
       if (!onsets.length || (p !== base && onsets.length === 1 && onsets[0] === 0)) {
         // Empty beat, or a lone hit on the beat in a triplet bar: no tuplet needed.
         const code = codeFor(beatQ);
-        beatNotes.push(onsets.length ? vfNote(hitsAt(0), code) : vfRest(code));
+        beatNotes.push(onsets.length ? stick(vfNote(hitsAt(0), code), b * p) : vfRest(code));
       } else {
         if (onsets[0] > 0) for (const k of splitSteps(onsets[0], stepQ)) beatNotes.push(vfRest(codeFor(k * stepQ)));
         onsets.forEach((k, idx) => {
           const [first, ...rests] = splitSteps((onsets[idx + 1] ?? p) - k, stepQ);
-          beatNotes.push(vfNote(hitsAt(k), codeFor(first * stepQ)));
+          beatNotes.push(stick(vfNote(hitsAt(k), codeFor(first * stepQ)), b * p + k));
           for (const r of rests) beatNotes.push(vfRest(codeFor(r * stepQ)));
         });
         if (p !== base) {
@@ -2190,6 +2249,16 @@ function frame() {
     if (now && now.count) status = "count-in…";
     else if (S.playing) status = "playing" + (playBar !== null ? ` · bar ${playBar + 1}` : "");
     if (now && !now.count && S.reps) status += ` · rep ${Math.min(now.rep + 1, S.reps)}/${S.reps}`;
+
+    // Repetitions left, counting down like the timer.
+    const repsEl = $("reps-left");
+    const finished = !S.playing && S.reps && R.rep >= S.reps;
+    let left = S.reps;
+    if (now && !now.count) left = Math.max(1, S.reps - now.rep);
+    const repsText = finished ? "done" : left + " left";
+    if (repsEl.textContent !== repsText) repsEl.textContent = repsText;
+    repsEl.classList.toggle("show", !!S.reps);
+    repsEl.classList.toggle("done", !!finished);
     if (S.selection) {
       const [a, b] = S.selection;
       status += ` · loop ${a + 1}${b !== a ? "–" + (b + 1) : ""}`;

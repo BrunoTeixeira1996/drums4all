@@ -95,6 +95,8 @@ HH|--x-x-x-|x-x-x-|------------|
 - **Each character is one step of the grid.** The number of steps sets the subdivision:
   in 4/4, 4 = quarter notes, 8 = 8th notes, 12 = triplets, 16 = 16th notes.
 - `TS|...|` (optional) sets the time signature of each bar in that block; otherwise `Time:` applies.
+- `ST|...|` (optional) is the sticking, printed under the notes: `R`, `L`, `U` (unison, both hands) or `-`.
+  In the grid it is the `ST` row under the instruments: click a cell or type `r` `l` `u`.
 - Spaces inside a bar are ignored (`o · o ·` = `o·o·`), so tabs pasted from drumtabs.app work.
 - Blank lines separate blocks (lines). The count line `1 + 2 +` and lines starting with `#` are ignored.
 

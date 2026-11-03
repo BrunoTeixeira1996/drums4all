@@ -52,6 +52,9 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 
 - Text format: `Title:`, `Tempo:`, `Time:` headers; one row per instrument (`C R HH T1 T2 S FT B HF`), `|` between
   bars, one character per grid step; optional `TS|3/4|4/4|` row for per-bar time signatures; count line ignored.
+- Optional `ST|RLU-|` row: sticking (`bar.sticking`, same length as the bar), drawn as bold letters under the
+  notes on the sheet/PDF. The grid shows it as an extra `ST` row (`gridRows`, `rowOf`, `setRow`); resample/
+  time-signature/copy/paste/clear carry it.
 - Model: each bar has its own `beats/unit` and one `steps` count shared by all instruments (`steps/beats` =
   subdivision: 2 eighths, 3 triplets, 4 sixteenths...). Rests are `-`. `serialize(parse(x))` must round-trip.
 - Symbols: `o x` hit, upper case accent, `g` ghost, `f` flam, `x` on S = rim, `o` on HH = open, `b` on R = bell.
