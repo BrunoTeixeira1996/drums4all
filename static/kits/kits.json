@@ -1,0 +1,236 @@
+{
+ "pearl": {
+  "name": "Pearl (rock)",
+  "credit": "AVL Drumkits Black Pearl 2023 by Glen MacArthur, CC BY-SA",
+  "sounds": {
+   "kick": [
+    "pearl/kick-0.flac",
+    "pearl/kick-1.flac",
+    "pearl/kick-2.flac",
+    "pearl/kick-3.flac"
+   ],
+   "snare": [
+    "pearl/snare-0.flac",
+    "pearl/snare-1.flac",
+    "pearl/snare-2.flac",
+    "pearl/snare-3.flac"
+   ],
+   "rim": [
+    "pearl/rim-0.flac",
+    "pearl/rim-1.flac",
+    "pearl/rim-2.flac",
+    "pearl/rim-3.flac"
+   ],
+   "hh_closed": [
+    "pearl/hh_closed-0.flac",
+    "pearl/hh_closed-1.flac",
+    "pearl/hh_closed-2.flac",
+    "pearl/hh_closed-3.flac"
+   ],
+   "hh_open": [
+    "pearl/hh_open-0.flac",
+    "pearl/hh_open-1.flac",
+    "pearl/hh_open-2.flac",
+    "pearl/hh_open-3.flac"
+   ],
+   "hh_pedal": [
+    "pearl/hh_pedal-0.flac",
+    "pearl/hh_pedal-1.flac",
+    "pearl/hh_pedal-2.flac",
+    "pearl/hh_pedal-3.flac"
+   ],
+   "crash": [
+    "pearl/crash-0.flac",
+    "pearl/crash-1.flac",
+    "pearl/crash-2.flac",
+    "pearl/crash-3.flac"
+   ],
+   "ride": [
+    "pearl/ride-0.flac",
+    "pearl/ride-1.flac",
+    "pearl/ride-2.flac",
+    "pearl/ride-3.flac"
+   ],
+   "ride_bell": [
+    "pearl/ride_bell-0.flac",
+    "pearl/ride_bell-1.flac",
+    "pearl/ride_bell-2.flac",
+    "pearl/ride_bell-3.flac"
+   ],
+   "tom_hi": [
+    "pearl/tom_hi-0.flac",
+    "pearl/tom_hi-1.flac",
+    "pearl/tom_hi-2.flac",
+    "pearl/tom_hi-3.flac"
+   ],
+   "tom_mid": [
+    "pearl/tom_mid-0.flac",
+    "pearl/tom_mid-1.flac",
+    "pearl/tom_mid-2.flac",
+    "pearl/tom_mid-3.flac"
+   ],
+   "tom_floor": [
+    "pearl/tom_floor-0.flac",
+    "pearl/tom_floor-1.flac",
+    "pearl/tom_floor-2.flac",
+    "pearl/tom_floor-3.flac"
+   ]
+  }
+ },
+ "tama": {
+  "name": "Tama (jazz)",
+  "credit": "AVL Drumkits Blonde Bop by Glen MacArthur, CC BY-SA",
+  "sounds": {
+   "kick": [
+    "tama/kick-0.flac",
+    "tama/kick-1.flac",
+    "tama/kick-2.flac",
+    "tama/kick-3.flac"
+   ],
+   "snare": [
+    "tama/snare-0.flac",
+    "tama/snare-1.flac",
+    "tama/snare-2.flac",
+    "tama/snare-3.flac"
+   ],
+   "rim": [
+    "tama/rim-0.flac",
+    "tama/rim-1.flac",
+    "tama/rim-2.flac",
+    "tama/rim-3.flac"
+   ],
+   "hh_closed": [
+    "tama/hh_closed-0.flac",
+    "tama/hh_closed-1.flac",
+    "tama/hh_closed-2.flac",
+    "tama/hh_closed-3.flac"
+   ],
+   "hh_open": [
+    "tama/hh_open-0.flac",
+    "tama/hh_open-1.flac",
+    "tama/hh_open-2.flac",
+    "tama/hh_open-3.flac"
+   ],
+   "hh_pedal": [
+    "tama/hh_pedal-0.flac",
+    "tama/hh_pedal-1.flac",
+    "tama/hh_pedal-2.flac",
+    "tama/hh_pedal-3.flac"
+   ],
+   "crash": [
+    "tama/crash-0.flac",
+    "tama/crash-1.flac",
+    "tama/crash-2.flac",
+    "tama/crash-3.flac"
+   ],
+   "ride": [
+    "tama/ride-0.flac",
+    "tama/ride-1.flac",
+    "tama/ride-2.flac",
+    "tama/ride-3.flac"
+   ],
+   "ride_bell": [
+    "tama/ride_bell-0.flac",
+    "tama/ride_bell-1.flac",
+    "tama/ride_bell-2.flac",
+    "tama/ride_bell-3.flac"
+   ],
+   "tom_hi": [
+    "tama/tom_hi-0.flac",
+    "tama/tom_hi-1.flac",
+    "tama/tom_hi-2.flac",
+    "tama/tom_hi-3.flac"
+   ],
+   "tom_mid": [
+    "tama/tom_mid-0.flac",
+    "tama/tom_mid-1.flac",
+    "tama/tom_mid-2.flac",
+    "tama/tom_mid-3.flac"
+   ],
+   "tom_floor": [
+    "tama/tom_floor-0.flac",
+    "tama/tom_floor-1.flac",
+    "tama/tom_floor-2.flac",
+    "tama/tom_floor-3.flac"
+   ]
+  }
+ },
+ "gmrock": {
+  "name": "GM Rock",
+  "credit": "Hydrogen GMRockKit by Glen MacArthur / Sebastian Moors, GPL",
+  "sounds": {
+   "kick": [
+    "gmrock/kick-0.flac",
+    "gmrock/kick-1.flac",
+    "gmrock/kick-2.flac",
+    "gmrock/kick-3.flac"
+   ],
+   "snare": [
+    "gmrock/snare-0.flac",
+    "gmrock/snare-1.flac",
+    "gmrock/snare-2.flac",
+    "gmrock/snare-3.flac"
+   ],
+   "rim": [
+    "gmrock/rim-0.flac",
+    "gmrock/rim-1.flac",
+    "gmrock/rim-2.flac",
+    "gmrock/rim-3.flac"
+   ],
+   "hh_closed": [
+    "gmrock/hh_closed-0.flac",
+    "gmrock/hh_closed-1.flac",
+    "gmrock/hh_closed-2.flac",
+    "gmrock/hh_closed-3.flac"
+   ],
+   "hh_open": [
+    "gmrock/hh_open-0.flac",
+    "gmrock/hh_open-1.flac",
+    "gmrock/hh_open-2.flac",
+    "gmrock/hh_open-3.flac"
+   ],
+   "hh_pedal": [
+    "gmrock/hh_pedal-0.flac",
+    "gmrock/hh_pedal-1.flac",
+    "gmrock/hh_pedal-2.flac",
+    "gmrock/hh_pedal-3.flac"
+   ],
+   "crash": [
+    "gmrock/crash-0.flac",
+    "gmrock/crash-1.flac",
+    "gmrock/crash-2.flac",
+    "gmrock/crash-3.flac"
+   ],
+   "ride": [
+    "gmrock/ride-0.flac",
+    "gmrock/ride-1.flac",
+    "gmrock/ride-2.flac",
+    "gmrock/ride-3.flac"
+   ],
+   "ride_bell": [
+    "gmrock/ride_bell-0.flac",
+    "gmrock/ride_bell-1.flac",
+    "gmrock/ride_bell-2.flac",
+    "gmrock/ride_bell-3.flac"
+   ],
+   "tom_hi": [
+    "gmrock/tom_hi-0.flac",
+    "gmrock/tom_hi-1.flac",
+    "gmrock/tom_hi-2.flac",
+    "gmrock/tom_hi-3.flac"
+   ],
+   "tom_mid": [
+    "gmrock/tom_mid-0.flac",
+    "gmrock/tom_mid-1.flac",
+    "gmrock/tom_mid-2.flac",
+    "gmrock/tom_mid-3.flac"
+   ],
+   "tom_floor": [
+    "gmrock/tom_floor-0.flac",
+    "gmrock/tom_floor-1.flac",
+    "gmrock/tom_floor-2.flac",
+    "gmrock/tom_floor-3.flac"
+   ]
+  }
+ }
+}

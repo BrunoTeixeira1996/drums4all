@@ -1,0 +1,2119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drums4all</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥁</text></svg>">
+<style>
+  /* Colours from rexim's Gruber Darker theme (minus the yellow). */
+  :root {
+    color-scheme: dark;
+    --bg-1: #101010;
+    --bg: #181818;
+    --bg1: #282828;
+    --bg2: #453d41;
+    --bg4: #52494e;
+    --fg: #e4e4ef;
+    --fg1: #f4f4ff;
+    --quartz: #95a99f;
+    --niagara: #96a6c8;
+    --niagara-1: #565f73;
+    --niagara-2: #303540;
+    --wisteria: #9e95c7;
+    --green: #73c936;
+    --red: #f43841;
+    --red1: #ff4f58;
+    --brown: #cc8c3c;
+    --mono: "Iosevka", "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 13px/1.4 var(--mono);
+    display: flex; flex-direction: column;
+  }
+  ::selection { background: var(--niagara-2); }
+  button, select, input { font: inherit; color: inherit; }
+  button {
+    background: transparent; border: 1px solid var(--bg1); border-radius: 3px;
+    padding: 4px 8px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover { background: var(--bg1); }
+  button:disabled { opacity: .35; cursor: default; background: transparent; }
+  button.on { color: var(--niagara); background: var(--niagara-2); border-color: var(--niagara-1); }
+  select, input { background: var(--bg-1); border: 1px solid var(--bg1); border-radius: 3px; padding: 3px 6px; }
+  select:focus, input:focus, button:focus-visible { outline: 1px solid var(--niagara-1); outline-offset: 0; }
+  label.field { display: flex; align-items: center; gap: 6px; color: var(--quartz); }
+  label.field input, label.field select { color: var(--fg); }
+  .label { color: var(--niagara-1); font-size: 11px; margin-right: 2px; }
+
+  header, .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+    padding: 8px 14px; border-bottom: 1px solid var(--bg1);
+  }
+  header { background: var(--bg-1); }
+  .toolbar { padding: 6px 14px; }
+  .brand { color: var(--niagara); font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
+  .brand span { color: var(--quartz); font-weight: 400; }
+  .group { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  #kit, #click-sound { max-width: 130px; }
+  .sep { width: 1px; align-self: stretch; background: var(--bg1); }
+  #play { min-width: 84px; font-weight: 700; background: var(--green); color: var(--bg-1); border-color: var(--green); }
+  #play:hover { filter: brightness(1.08); }
+  #play.playing { background: var(--red); border-color: var(--red); color: var(--fg1); }
+  #bpm { width: 58px; text-align: center; font: 700 18px var(--mono); color: var(--fg1); padding: 0 4px; }
+  .unit { color: var(--quartz); font-size: 12px; }
+  #beats { display: flex; gap: 7px; align-items: center; }
+  #beats i { width: 10px; height: 10px; border-radius: 50%; background: var(--bg1); display: block; }
+  #beats i.lit { background: var(--niagara); }
+  #beats i.lit.one { background: var(--brown); }
+  #status { color: var(--quartz); min-width: 150px; }
+  #ramp-cfg { display: none; color: var(--quartz); font-size: 12px; gap: 4px; align-items: center; }
+  #ramp-cfg.show { display: flex; }
+  #ramp-cfg input { width: 48px; padding: 1px 4px; }
+  #clear-sel { display: none; }
+  #clear-sel.show { display: inline-block; }
+  #tabs { max-width: 240px; }
+  #title { width: 200px; }
+  #tempo { width: 62px; }
+  #save-status { color: var(--niagara-1); font-size: 12px; }
+  #save-status.err { color: var(--red1); }
+  #where { color: var(--niagara-1); font-size: 12px; }
+
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pane { min-height: 0; overflow: auto; }
+  #grid-pane { border-right: 1px solid var(--bg1); display: flex; flex-direction: column; }
+  .hint { color: var(--niagara-1); font-size: 12px; padding: 10px 14px 0; }
+  .hint b { color: var(--quartz); font-weight: 400; }
+  .hint kbd { font: 11px var(--mono); color: var(--quartz); background: var(--bg1); border-radius: 2px; padding: 0 4px; }
+  #grid-wrap { position: relative; flex: 1; overflow: auto; padding-bottom: 40px; }
+  #grid { display: block; outline: none; }
+  #text-wrap { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  #grid-pane.text #grid-wrap, #grid-pane.text #legend { display: none; }
+  #grid-pane.text #text-wrap { display: flex; }
+  textarea {
+    flex: 1; min-height: 260px; resize: none; border: 0; outline: 0; padding: 14px;
+    background: var(--bg); color: var(--fg); font: 13px/1.6 var(--mono); white-space: pre; tab-size: 4;
+  }
+  #error { color: var(--red1); font-size: 12px; padding: 6px 14px; min-height: 1.5em; border-top: 1px solid var(--bg1); }
+
+  #picker {
+    position: absolute; z-index: 5; display: none; flex-wrap: wrap; gap: 3px; padding: 6px;
+    background: var(--bg-1); border: 1px solid var(--bg2); border-radius: 4px; box-shadow: 0 8px 24px #0009;
+    max-width: 290px;
+  }
+  #picker.show { display: flex; }
+  #picker .title { flex-basis: 100%; color: var(--quartz); font-size: 11px; padding: 0 2px 4px; }
+  #picker button { display: flex; flex-direction: column; align-items: center; min-width: 50px; padding: 4px 6px; border-color: transparent; }
+  #picker button:hover { background: var(--bg1); }
+  #picker button b { font-size: 17px; color: var(--niagara); }
+  #picker button b.acc { color: var(--brown); }
+  #picker button span { font-size: 10px; color: var(--quartz); }
+  #picker button.current { border-color: var(--niagara-1); background: var(--niagara-2); }
+
+  #sheet-pane { background: var(--bg-1); }
+  .paper { background: #fafafa; color: #181818; margin: 16px; padding: 18px 10px 22px; border-radius: 2px; min-height: 200px; }
+  .paper h2 { margin: 0 0 4px; text-align: center; font: 400 24px Georgia, "Times New Roman", serif; }
+  #sheet { position: relative; }
+  #sheet svg { display: block; }
+  .hl { position: absolute; pointer-events: none; border-radius: 3px; display: none; }
+  #hl-play { background: #f438411a; }
+  #hl-cursor { border: 1px solid #565f73; }
+  #sheet-msg { color: #c73c3f; font-size: 12px; padding: 4px 12px; }
+  .legend { border-top: 1px solid var(--bg1); padding: 10px 14px 12px; color: var(--quartz); font-size: 12px; }
+  .legend dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 14px; margin: 0 0 8px; }
+  .legend div { display: flex; gap: 8px; }
+  .legend dt { color: var(--niagara); min-width: 22px; }
+  .legend dt.acc { color: var(--brown); }
+  .legend dt.ghost { color: var(--wisteria); }
+  .legend dd { margin: 0; }
+  .legend h4 { margin: 0 0 4px; font-size: 11px; font-weight: 400; color: var(--niagara-1); }
+  #sheet-key { border-top: 1px solid #e2e2e2; margin-top: 10px; padding-top: 6px; }
+  #sheet-key p { margin: 0 0 0 12px; font: 11px var(--mono); color: #777; }
+
+  @media (max-width: 900px) {
+    main { display: flex; flex-direction: column; overflow: auto; }
+    .pane { overflow: visible; }
+    #grid-pane { border-right: 0; border-bottom: 1px solid var(--bg1); }
+    #grid-wrap { max-height: 62vh; padding-bottom: 90px; }
+    #title { width: 150px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">drums4all<span>/</span></div>
+  <div class="group">
+    <button id="play" title="Space">▶ Play</button>
+    <button data-bpm="-1" title="PgDn">−</button>
+    <input id="bpm" type="number" min="20" max="300" value="80" aria-label="BPM">
+    <button data-bpm="1" title="PgUp">+</button>
+    <span class="unit">BPM ♩</span>
+  </div>
+  <div id="beats"></div>
+  <div class="group">
+    <button id="t-click" class="on" title="M">Metronome</button>
+    <button id="t-sub" title="N: clicks per beat">÷1</button>
+    <button id="t-drums" class="on" title="D">Drums</button>
+    <button id="t-count" class="on" title="C">Count-in</button>
+    <button id="t-loop" class="on" title="L">Loop</button>
+    <button id="t-ramp" title="R">Speed up</button>
+    <span id="ramp-cfg">+<input id="ramp-step" type="number" min="1" max="20" value="2"> BPM every
+      <input id="ramp-every" type="number" min="1" max="64" value="4"> loops up to
+      <input id="ramp-max" type="number" min="20" max="300" value="200"></span>
+  </div>
+  <div class="group">
+    <label class="field">kit <select id="kit" title="Drum sounds"></select></label>
+    <label class="field">click <select id="click-sound" title="Metronome sound"></select></label>
+  </div>
+  <div class="group">
+    <span id="status">stopped</span>
+    <button id="clear-sel" title="Esc">✕ clear loop</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="group">
+    <span class="label">tab</span>
+    <select id="tabs" aria-label="Saved tabs"></select>
+    <button id="new">New</button>
+    <button id="delete">Delete</button>
+    <button id="import">Import .txt</button>
+    <button id="export-txt">Export .txt</button>
+    <button id="export-wav">Export .wav</button>
+    <button id="export-midi" title="General MIDI drums (channel 10)">Export MIDI</button>
+    <button id="export-pdf">Export PDF</button>
+    <input id="file" type="file" accept=".txt,text/plain" hidden>
+    <span id="save-status"></span>
+  </div>
+  <div class="sep"></div>
+  <div class="group">
+    <label class="field">Title <input id="title"></label>
+    <label class="field">Tempo <input id="tempo" type="number" min="20" max="300"></label>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="group">
+    <span class="label">bar</span>
+    <label class="field">Time <select id="bar-time" title="Time signature of this bar"></select></label>
+    <button id="time-all" title="Use this time signature in every bar">All bars</button>
+    <label class="field">Subdivision
+      <select id="subdiv" title="Grid of this bar">
+        <option value="1">quarter notes</option>
+        <option value="2">8th notes</option>
+        <option value="3">triplets</option>
+        <option value="4">16th notes</option>
+        <option value="6">sextuplets</option>
+        <option value="8">32nd notes</option>
+        <option value="" disabled>other</option>
+      </select>
+    </label>
+  </div>
+  <div class="sep"></div>
+  <div class="group">
+    <button id="bar-add" title="Insert an empty bar after this one">+ Bar</button>
+    <button id="bar-dup" title="Duplicate this bar">Dup</button>
+    <button id="bar-del" title="Delete this bar">Delete</button>
+    <button id="bar-clear">Clear</button>
+    <button id="bar-break" title="Start a new line at this bar">New line</button>
+    <button id="bar-copy" title="Ctrl+C">Copy</button>
+    <button id="bar-paste" title="Ctrl+V">Paste</button>
+  </div>
+  <div class="sep"></div>
+  <div class="group">
+    <button id="undo" title="Ctrl+Z">↶</button>
+    <button id="redo" title="Ctrl+Y">↷</button>
+    <select id="add-inst" aria-label="Add instrument"></select>
+    <button id="text-mode" title="Edit the tab as text">Text</button>
+    <span id="where"></span>
+  </div>
+</div>
+
+<main>
+  <section class="pane" id="grid-pane">
+    <div class="hint">Click a cell and pick a note · or type <kbd>o</kbd> <kbd>O</kbd> <kbd>x</kbd> <kbd>X</kbd> <kbd>g</kbd> <kbd>f</kbd> <kbd>b</kbd>,
+      <kbd>-</kbd>/<kbd>Del</kbd> clears, arrows move · <b>Time</b> and <b>Subdivision</b> apply to the selected bar (e.g. one bar of 3/4, or triplets)
+      · click a bar number to loop it (<kbd>Shift</kbd> extends)</div>
+    <div id="grid-wrap">
+      <canvas id="grid" tabindex="0"></canvas>
+      <div id="picker"></div>
+    </div>
+    <div class="legend" id="legend">
+      <h4>instruments</h4>
+      <dl>
+        <div><dt>C</dt><dd>crash</dd></div>
+        <div><dt>R</dt><dd>ride</dd></div>
+        <div><dt>HH</dt><dd>hi-hat</dd></div>
+        <div><dt>HF</dt><dd>hi-hat pedal</dd></div>
+        <div><dt>T1</dt><dd>high tom</dd></div>
+        <div><dt>T2</dt><dd>mid tom</dd></div>
+        <div><dt>S</dt><dd>snare</dd></div>
+        <div><dt>FT</dt><dd>floor tom</dd></div>
+        <div><dt>B</dt><dd>bass drum (kick)</dd></div>
+      </dl>
+      <h4>symbols</h4>
+      <dl>
+        <div><dt>o x</dt><dd>hit</dd></div>
+        <div><dt class="acc">O X</dt><dd>accent</dd></div>
+        <div><dt class="ghost">g</dt><dd>ghost note</dd></div>
+        <div><dt>f</dt><dd>flam</dd></div>
+        <div><dt>x</dt><dd>on S: rim</dd></div>
+        <div><dt>o</dt><dd>on HH: open</dd></div>
+        <div><dt>b</dt><dd>on R: bell</dd></div>
+        <div><dt>·</dt><dd>rest</dd></div>
+      </dl>
+    </div>
+    <div id="text-wrap">
+      <textarea id="editor" spellcheck="false" autocomplete="off" aria-label="Tab as text"></textarea>
+      <div id="error"></div>
+    </div>
+  </section>
+  <section class="pane" id="sheet-pane">
+    <div class="paper">
+      <h2 id="sheet-title"></h2>
+      <div id="sheet-msg"></div>
+      <div id="sheet"><div class="hl" id="hl-cursor"></div><div class="hl" id="hl-play"></div></div>
+      <div id="sheet-key"><p>where each drum goes on the staff</p></div>
+    </div>
+  </section>
+</main>
+
+<script src="static/vendor/vexflow.js"></script>
+<script src="static/vendor/jspdf.umd.min.js"></script>
+<script src="static/vendor/svg2pdf.umd.min.js"></script>
+<script>
+"use strict";
+
+const TEMPLATE = `Title: New groove
+Tempo: 80
+Time: 4/4
+
+ C|x-------|--------|
+HH|-x-x-x-x|x-x-x-x-|
+ S|----o---|----o--g|
+ B|o-------|o---o-o-|
+`;
+
+// ---------------------------------------------------------------- tab model
+// song = { title, tempo, beats, unit, insts: [...], bars: [{ steps, beats, unit, notes: { inst: "o--x" }, lineBreak }] }
+// Each bar has its own time signature and one step count shared by all its instruments; rests are "-".
+// song.beats/unit is the default (the "Time:" header).
+
+const REST = new Set("-.·_");
+const NOTE = new Set("oOxXgGfFbB");
+const INSTRUMENTS = {
+  C: ["C", "CC", "CR", "CRASH"],
+  R: ["R", "RD", "RC", "RIDE"],
+  HH: ["HH", "H", "HAT", "HIHAT"],
+  T1: ["T1", "HT", "T"],
+  T2: ["T2", "MT"],
+  S: ["S", "SD", "SN", "SNARE"],
+  FT: ["FT", "T3", "LT", "F"],
+  B: ["B", "BD", "K", "KICK"],
+  HF: ["HF", "FH", "HP", "PEDAL"],
+};
+const ORDER = Object.keys(INSTRUMENTS);
+const BASE = ["C", "HH", "T1", "S", "FT", "B"];
+const INST_NAME = {
+  C: "Crash", R: "Ride", HH: "Hi-hat", T1: "High tom", T2: "Mid tom",
+  S: "Snare", FT: "Floor tom", B: "Bass drum", HF: "Hi-hat pedal",
+};
+const ALIASES = {};
+for (const [canon, names] of Object.entries(INSTRUMENTS)) for (const n of names) ALIASES[n] = canon;
+const ROW_RE = /^\s*([A-Za-z][A-Za-z0-9]*)\s*\|(.*)$/;
+const HEADER_RE = /^\s*(title|tempo|bpm|time|time signature)\s*:\s*(.*?)\s*$/i;
+const TIME_SIGS = ["2/4", "3/4", "4/4", "5/4", "6/4", "7/4", "3/8", "5/8", "6/8", "7/8", "9/8", "12/8"];
+const MAX_STEPS = 96;
+
+class TabError extends Error {
+  constructor(message, line) {
+    super(line ? `line ${line}: ${message}` : message);
+    this.line = line;
+  }
+}
+
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+const lcm = (a, b) => (a / gcd(a, b)) * b;
+
+function parse(text) {
+  const song = { title: "", tempo: null, beats: 4, unit: 4, insts: [], bars: [] };
+  const blocks = [];
+  let block = null;
+  let sig = null;  // time signature for the next blocks, set by "Time:" lines
+  const newBlock = () => {
+    block = { rows: {}, ts: null, sig: sig || [song.beats, song.unit] };
+    blocks.push(block);
+  };
+  text.split("\n").forEach((raw, idx) => {
+    const n = idx + 1;
+    const line = raw.replace(/\s+$/, "");
+    if (!line.trim() || line.trim().startsWith("#")) { block = null; return; }
+
+    let m = HEADER_RE.exec(line);
+    if (m) {
+      const key = m[1].toLowerCase(), value = m[2];
+      if (key === "title") song.title = value;
+      else if (key === "tempo" || key === "bpm") {
+        const v = parseFloat(value);
+        if (!isFinite(v)) throw new TabError(`invalid tempo '${value}'`, n);
+        song.tempo = v;
+      } else {
+        const ts = parseTimeSig(value);
+        if (!ts) throw new TabError(`invalid time signature '${value}' (e.g. 4/4)`, n);
+        sig = ts;
+        if (!blocks.length) [song.beats, song.unit] = ts;
+      }
+      block = null;
+      return;
+    }
+
+    m = ROW_RE.exec(line);
+    if (!m) { block = null; return; }  // count lines ("1 + 2 +") and the like
+    const name = m[1];
+    const parts = m[2].split("|");
+    if (!parts[parts.length - 1].trim()) parts.pop();
+
+    // "TS|3/4|4/4|": time signature of each bar in this block.
+    if (name.toUpperCase() === "TS") {
+      if (!block) newBlock();
+      block.ts = parts.map(p => {
+        if (!p.trim()) return null;
+        const ts = parseTimeSig(p);
+        if (!ts) throw new TabError(`invalid time signature '${p.trim()}'`, n);
+        return ts;
+      });
+      return;
+    }
+
+    const canon = ALIASES[name.toUpperCase()];
+    if (!canon) throw new TabError(`unknown instrument '${name}'`, n);
+    const bars = parts.map(p => {
+      const sym = p.replace(/\s+/g, "");
+      for (const ch of sym) {
+        if (!REST.has(ch) && !NOTE.has(ch)) throw new TabError(`invalid symbol '${ch}' in ${name}`, n);
+      }
+      return [...sym].map(ch => (REST.has(ch) ? "-" : ch)).join("");
+    });
+    if (!block) newBlock();
+    if (block.rows[canon]) throw new TabError(`instrument '${name}' repeated in the same block`, n);
+    block.rows[canon] = bars;
+  });
+
+  const used = new Set(blocks.flatMap(b => Object.keys(b.rows)));
+  song.insts = ORDER.filter(i => BASE.includes(i) || used.has(i));
+  blocks.forEach(({ rows, ts, sig: blockSig }) => {
+    const count = Math.max(0, ...Object.values(rows).map(v => v.length), ts ? ts.length : 0);
+    for (let i = 0; i < count; i++) {
+      const [beats, unit] = (ts && ts[i]) || blockSig;
+      const lens = Object.values(rows).map(v => (v[i] || "").length).filter(Boolean);
+      const steps = lens.length ? lens.reduce(lcm, 1) : beats * 2;
+      if (steps > MAX_STEPS) throw new TabError(`bar ${song.bars.length + 1} mixes subdivisions that don't fit together`);
+      const notes = {};
+      for (const inst of song.insts) notes[inst] = stretch((rows[inst] || [])[i] || "", steps);
+      song.bars.push({ steps, beats, unit, notes, lineBreak: i === 0 && song.bars.length > 0 });
+    }
+  });
+  if (!song.bars.length) throw new TabError("no bars found (lines like 'S|o-o-|')");
+  return song;
+}
+
+// Spread a row onto a finer grid: "o-" on 4 steps -> "o---".
+function stretch(row, steps) {
+  if (!row) return "-".repeat(steps);
+  const k = steps / row.length;
+  const out = Array(steps).fill("-");
+  [...row].forEach((ch, j) => { out[j * k] = ch; });
+  return out.join("");
+}
+
+function parseTimeSig(value) {
+  const m = /^\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(value);
+  if (!m || +m[1] < 1 || +m[1] > 16 || ![2, 4, 8, 16].includes(+m[2])) return null;
+  return [+m[1], +m[2]];
+}
+
+const sigOf = bar => `${bar.beats}/${bar.unit}`;
+
+function serialize(song) {
+  [song.beats, song.unit] = [song.bars[0].beats, song.bars[0].unit];
+  const def = sigOf(song.bars[0]);
+  const out = [];
+  if (song.title) out.push(`Title: ${song.title}`);
+  if (song.tempo) out.push(`Tempo: ${song.tempo}`);
+  out.push(`Time: ${def}`);
+  const w = Math.max(2, ...song.insts.map(i => i.length));
+  const blocks = [];
+  song.bars.forEach((bar, i) => {
+    if (i === 0 || bar.lineBreak) blocks.push([]);
+    blocks[blocks.length - 1].push(bar);
+  });
+  for (const bars of blocks) {
+    out.push("");
+    if (bars.some(b => sigOf(b) !== def)) {
+      out.push("TS".padStart(w) + "|" + bars.map(b => sigOf(b).padEnd(b.steps)).join("|") + "|");
+    }
+    for (const inst of song.insts) out.push(inst.padStart(w) + "|" + bars.map(b => b.notes[inst]).join("|") + "|");
+    if (bars.every(b => b.beats < 10)) {
+      out.push(" ".repeat(w + 1) + bars.map(b => countLabels(b.steps, b.beats).map(l => l || " ").join("").padEnd(Math.max(b.steps, sigOf(b).length))).join(" "));
+    }
+  }
+  return out.join("\n") + "\n";
+}
+
+function countLabels(steps, beats) {
+  if (!steps || steps % beats) return Array.from({ length: steps }, (_, i) => (i ? "" : "1"));
+  const per = steps / beats;
+  const syl = { 1: [], 2: ["+"], 3: ["+", "a"], 4: ["e", "+", "a"] }[per] || Array(per - 1).fill("·");
+  const out = [];
+  for (let b = 0; b < beats; b++) out.push(String(b + 1), ...syl);
+  return out;
+}
+
+// ---------------------------------------------------------------- sounds
+// Drums are recorded samples (static/kits, built by tools/build_kits.py) with four velocity layers
+// each: ghost, soft, normal, accent. The metronome sounds are synthesized.
+
+const CLICKS = { beep: "Beep", wood: "Woodblock", cowbell: "Cowbell" };
+
+function synth(sr) {
+  const N = d => Math.floor(sr * d);
+  const gen = (d, f) => { const a = new Float32Array(N(d)); for (let i = 0; i < a.length; i++) a[i] = f(i / sr, i); return a; };
+  const noise = d => gen(d, () => Math.random() * 2 - 1);
+  const hp = (x, passes = 1) => {
+    for (let p = 0; p < passes; p++) { let prev = 0; for (let i = 0; i < x.length; i++) { const v = x[i]; x[i] = v - prev; prev = v; } }
+    return x;
+  };
+  // One-pole low-pass: a in (0, 1], smaller is darker.
+  const lp = (x, a) => { let y = 0; for (let i = 0; i < x.length; i++) { y += a * (x[i] - y); x[i] = y; } return x; };
+  const norm = (x, gain) => {
+    let m = 0;
+    for (const v of x) m = Math.max(m, Math.abs(v));
+    const s = m ? gain / m : 0;
+    for (let i = 0; i < x.length; i++) x[i] *= s;
+    return x;
+  };
+  const sweep = (f0, f1, d, speed) => {
+    let ph = 0;
+    return gen(d, t => { ph += 2 * Math.PI * (f1 + (f0 - f1) * Math.exp(-t * speed)) / sr; return Math.sin(ph); });
+  };
+  return { sr, N, gen, noise, hp, lp, norm, sweep, TAU: 2 * Math.PI };
+}
+
+function makeClicks(sr, kind) {
+  const { gen, noise, hp, lp, norm, TAU } = synth(sr);
+  const beep = (f, gain) => norm(gen(0.04, t => Math.sin(TAU * f * t) * Math.exp(-t * 120)), gain);
+  const wood = (f, gain) => {
+    const nz = hp(noise(0.06));
+    return norm(gen(0.06, (t, i) =>
+      (Math.sin(TAU * f * t) * 0.7 + Math.sin(TAU * f * 2.3 * t) * 0.3) * Math.exp(-t * 90) + nz[i] * Math.exp(-t * 900) * 0.3), gain);
+  };
+  const cowbell = (f, gain) => lp(norm(gen(0.25, t =>
+    (Math.sign(Math.sin(TAU * f * t)) + Math.sign(Math.sin(TAU * f * 1.48 * t))) * Math.exp(-t * 14)), gain), 0.35);
+  const [make, hi, lo] = { beep: [beep, 1600, 1000], wood: [wood, 1900, 1300], cowbell: [cowbell, 800, 560] }[kind];
+  return { click_accent: make(hi, 0.9), click: make(lo, 0.7), click_sub: make(lo * 0.8, 0.35) };
+}
+
+const soundCache = {};
+let kitManifest = null;
+
+function toBuffers(sr, raw) {
+  const out = {};
+  for (const [k, data] of Object.entries(raw)) {
+    const buf = new AudioBuffer({ length: data.length, sampleRate: sr, numberOfChannels: 1 });
+    buf.copyToChannel(data, 0);
+    out[k] = buf;
+  }
+  return out;
+}
+
+async function loadManifest() {
+  if (!kitManifest) kitManifest = await (await fetch("static/kits/kits.json")).json();
+  return kitManifest;
+}
+
+async function fetchSample(file) {
+  const res = await fetch("static/kits/" + file);
+  if (!res.ok) throw new Error(`${file}: ${res.status}`);
+  return R.ctx.decodeAudioData(await res.arrayBuffer());
+}
+
+// Load (once) and select the current kit and metronome sound.
+async function loadSounds() {
+  ensureAudio();
+  const kits = await loadManifest();
+  if (!kits[S.kit]) S.kit = Object.keys(kits)[0];
+  const kit = S.kit, kitKey = "kit:" + kit, clickKey = "click:" + S.clickSound;
+  if (!soundCache[kitKey]) {
+    soundCache[kitKey] = Promise.all(Object.entries(kits[kit].sounds).map(async ([name, files]) =>
+      [name, await Promise.all(files.map(fetchSample))])).then(Object.fromEntries);
+    soundCache[kitKey].catch(() => { delete soundCache[kitKey]; });
+  }
+  soundCache[clickKey] = soundCache[clickKey] || toBuffers(R.ctx.sampleRate, makeClicks(R.ctx.sampleRate, S.clickSound));
+  R.loading = true;
+  try {
+    const drums = await soundCache[kitKey];
+    if (kit === S.kit) R.sounds = { ...drums, ...soundCache[clickKey] };
+  } finally {
+    R.loading = false;
+  }
+}
+
+const DRUM_SOUND = { C: "crash", R: "ride", HF: "hh_pedal", T1: "tom_hi", T2: "tom_mid", FT: "tom_floor", B: "kick" };
+
+function hitFor(inst, ch) {
+  const low = ch.toLowerCase();
+  let vel = ch === low ? 0.75 : 1.0;
+  if (low === "g") vel = 0.3;
+  let sound;
+  if (inst === "HH") sound = low === "o" ? "hh_open" : "hh_closed";
+  else if (inst === "S") sound = low === "x" ? "rim" : "snare";
+  else if (inst === "R") sound = low === "b" ? "ride_bell" : "ride";
+  else sound = DRUM_SOUND[inst];
+  return [sound, vel, low === "f"];
+}
+
+// ---------------------------------------------------------------- scheduling
+// Every hit is scheduled on the AudioContext clock (sample accurate), a bar at a time, slightly ahead.
+
+const FLAM_GAP = 0.03;
+const LOOKAHEAD = 0.3;
+
+function makeBus(c) {
+  const limiter = c.createDynamicsCompressor();
+  limiter.threshold.value = -4; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.002; limiter.release.value = 0.1;
+  limiter.connect(c.destination);
+  const drums = c.createGain(), click = c.createGain();
+  drums.connect(limiter); click.connect(limiter);
+  return { limiter, drums, click, hh: null };
+}
+
+// Drum sounds are lists of velocity layers; the velocity picks the layer (and trims the level a bit).
+function playSound(c, dest, sounds, name, t, vel) {
+  const src = c.createBufferSource();
+  const layers = sounds[name];
+  const g = c.createGain();
+  if (Array.isArray(layers)) {
+    src.buffer = layers[Math.min(layers.length - 1, vel <= 0.35 ? 0 : vel <= 0.55 ? 1 : vel <= 0.85 ? 2 : 3)];
+    g.gain.value = 0.6 + 0.4 * vel;
+  } else {
+    src.buffer = layers;
+    g.gain.value = vel;
+  }
+  src.connect(g).connect(dest);
+  src.start(Math.max(t, 0));
+  return { src, g, t };
+}
+
+function scheduleBar(c, bus, sounds, bar, start, dur) {
+  const events = [];
+  for (const [inst, row] of Object.entries(bar.notes)) {
+    [...row].forEach((ch, j) => {
+      if (!NOTE.has(ch)) return;
+      const [sound, vel, flam] = hitFor(inst, ch);
+      const t = start + (j * dur) / bar.steps;
+      const hh = inst === "HH" || inst === "HF";
+      if (flam) events.push([t - FLAM_GAP, sound, vel * 0.4, hh]);
+      events.push([t, sound, vel, hh]);
+    });
+  }
+  events.sort((a, b) => a[0] - b[0]);
+  for (const [t, sound, vel, hh] of events) {
+    const hit = playSound(c, bus.drums, sounds, sound, t, vel);
+    if (!hh) continue;
+    // A new hi-hat hit chokes the previous one (open hat closing).
+    if (bus.hh && bus.hh.t < t) {
+      bus.hh.g.gain.setTargetAtTime(0, t, 0.003);
+      bus.hh.src.stop(t + 0.05);
+    }
+    bus.hh = hit;
+  }
+}
+
+function scheduleClicks(c, bus, sounds, start, dur, beats, sub) {
+  const per = beats * sub;
+  for (let i = 0; i < per; i++) {
+    const name = i === 0 ? "click_accent" : i % sub === 0 ? "click" : "click_sub";
+    playSound(c, bus.click, sounds, name, start + (i * dur) / per, 1);
+  }
+}
+
+// ---------------------------------------------------------------- state
+
+const S = {
+  song: null,   // last valid model
+  text: "",     // what gets saved (the file as written until the first grid edit)
+  error: null,
+  textMode: false,
+  bpm: 80,
+  click: true, drums: true, sub: 1, countIn: true, loop: true,
+  ramp: false, rampStep: 2, rampEvery: 4, rampMax: 200,
+  selection: null, playing: false,
+  cur: { bar: 0, row: 0, step: 0 },
+  clipboard: null,
+  kit: "pearl", clickSound: "beep",
+};
+const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, queue: [], endTime: null };
+const H = { undo: [], redo: [], mergeKey: null, mergeTime: 0 };
+
+const $ = id => document.getElementById(id);
+const editor = $("editor");
+
+// BPM counts quarter notes, so a 6/8 bar lasts 3 quarters.
+function barDur(bar) { return (bar.beats * (4 / bar.unit) * 60) / S.bpm; }
+
+function playOrder() {
+  const n = S.song.bars.length;
+  if (!S.selection) return [...Array(n).keys()];
+  const [a, b] = S.selection;
+  return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+}
+
+// ---------------------------------------------------------------- transport
+
+function ensureAudio() {
+  if (!R.ctx) {
+    R.ctx = new AudioContext({ latencyHint: "interactive" });
+  }
+  if (R.ctx.state === "suspended") R.ctx.resume();
+}
+
+function applyVolumes() {
+  if (!R.bus) return;
+  const t = R.ctx.currentTime;
+  R.bus.click.gain.setTargetAtTime(S.click ? 0.8 : 0, t, 0.01);
+  R.bus.drums.gain.setTargetAtTime(S.drums ? 1 : 0, t, 0.01);
+}
+
+async function play() {
+  if (!S.song || !S.song.bars.length || S.playing || R.loading) return;
+  try {
+    await loadSounds();
+  } catch (e) {
+    setSaveStatus("couldn't load the drum sounds: " + e.message, true);
+    return;
+  }
+  if (S.playing) return;
+  R.bus = makeBus(R.ctx);
+  applyVolumes();
+  R.nextStart = R.ctx.currentTime + 0.12;
+  R.nextIdx = 0;
+  R.countLeft = S.countIn ? 1 : 0;
+  R.loops = 0;
+  R.queue = [];
+  R.endTime = null;
+  S.playing = true;
+  tick();
+  R.timer = setInterval(tick, 25);
+  renderControls();
+}
+
+function stop(letRing = false) {
+  clearInterval(R.timer);
+  if (R.bus && !letRing) R.bus.limiter.disconnect();  // silences everything already scheduled
+  R.bus = letRing ? R.bus : null;
+  R.queue = [];
+  S.playing = false;
+  renderControls();
+}
+
+function togglePlay() { S.playing ? stop() : play(); }
+
+function tick() {
+  const c = R.ctx;
+  while (R.endTime === null && R.nextStart < c.currentTime + LOOKAHEAD) {
+    const song = S.song;
+    const order = playOrder();
+    if (!order.length) { R.endTime = R.nextStart; break; }
+    if (R.countLeft > 0) {
+      // Count in with the time signature of the first bar that will play.
+      const first = song.bars[order[0]];
+      const dur = barDur(first);
+      scheduleClicks(c, R.bus, R.sounds, R.nextStart, dur, first.beats, 1);
+      R.queue.push({ bar: null, start: R.nextStart, dur, beats: first.beats });
+      R.countLeft--;
+      R.nextStart += dur;
+      continue;
+    }
+    if (R.nextIdx >= order.length) {
+      if (!S.loop) { R.endTime = R.nextStart; break; }
+      R.nextIdx = 0;
+      R.loops++;
+      if (S.ramp && R.loops % S.rampEvery === 0 && S.bpm < S.rampMax) setBpm(Math.min(S.rampMax, S.bpm + S.rampStep));
+    }
+    const bi = order[R.nextIdx++];
+    const bar = song.bars[bi];
+    const dur = barDur(bar);
+    scheduleBar(c, R.bus, R.sounds, bar, R.nextStart, dur);
+    scheduleClicks(c, R.bus, R.sounds, R.nextStart, dur, bar.beats, S.sub);
+    R.queue.push({ bar: bi, start: R.nextStart, dur, beats: bar.beats });
+    R.nextStart += dur;
+  }
+}
+
+// What is being heard right now (the output latency is compensated).
+function nowPlaying() {
+  if (!S.playing) return null;
+  const c = R.ctx;
+  const heard = c.currentTime - (c.outputLatency || c.baseLatency || 0);
+  if (R.endTime !== null && heard > R.endTime) { stop(true); return null; }
+  while (R.queue.length > 1 && R.queue[0].start + R.queue[0].dur <= heard) R.queue.shift();
+  const e = R.queue[0];
+  if (!e || heard < e.start) return null;
+  const frac = Math.min(1, (heard - e.start) / e.dur);
+  return { bar: e.bar, count: e.bar === null, frac, beats: e.beats, beat: Math.floor(frac * e.beats) };
+}
+
+// ---------------------------------------------------------------- controls
+
+function setBpm(v) {
+  S.bpm = Math.round(Math.max(20, Math.min(300, +v || S.bpm)));
+  $("bpm").value = S.bpm;
+}
+
+function setSelection(sel) {
+  S.selection = sel;
+  R.nextIdx = 0;  // restart the loop from the new range at the next bar
+  renderControls();
+}
+
+const GRID_BUTTONS = ["bar-time", "time-all", "subdiv", "bar-add", "bar-dup", "bar-del", "bar-clear", "bar-break", "bar-copy", "bar-paste", "add-inst"];
+
+function renderControls() {
+  $("play").textContent = S.playing ? "■ Stop" : "▶ Play";
+  $("play").classList.toggle("playing", S.playing);
+  const flags = { "t-click": S.click, "t-drums": S.drums, "t-count": S.countIn, "t-loop": S.loop, "t-ramp": S.ramp };
+  for (const [id, on] of Object.entries(flags)) {
+    $(id).classList.toggle("on", on);
+    $(id).setAttribute("aria-pressed", on);
+  }
+  $("t-sub").textContent = "÷" + S.sub;
+  $("t-sub").classList.toggle("on", S.sub > 1);
+  $("ramp-cfg").classList.toggle("show", S.ramp);
+  $("clear-sel").classList.toggle("show", !!S.selection);
+  $("undo").disabled = !H.undo.length;
+  $("redo").disabled = !H.redo.length;
+  $("text-mode").classList.toggle("on", S.textMode);
+  $("grid-pane").classList.toggle("text", S.textMode);
+  for (const id of GRID_BUTTONS) $(id).disabled = S.textMode;
+  if (!S.song) return;
+
+  const song = S.song;
+  setField("title", song.title);
+  setField("tempo", song.tempo || "");
+
+  const bar = song.bars[S.cur.bar];
+  const sigs = TIME_SIGS.includes(sigOf(bar)) ? TIME_SIGS : [...TIME_SIGS, sigOf(bar)];
+  const timeSel = $("bar-time");
+  if (timeSel.options.length !== sigs.length) timeSel.innerHTML = sigs.map(s => `<option>${s}</option>`).join("");
+  timeSel.value = sigOf(bar);
+  const per = bar.steps % bar.beats ? "" : String(bar.steps / bar.beats);
+  $("subdiv").value = [...$("subdiv").options].some(o => o.value === per) ? per : "";
+  $("bar-break").classList.toggle("on", !!bar.lineBreak);
+  $("bar-break").disabled = S.textMode || S.cur.bar === 0;
+  $("bar-del").disabled = S.textMode || song.bars.length < 2;
+  $("bar-paste").disabled = S.textMode || !S.clipboard;
+
+  const missing = ORDER.filter(i => !song.insts.includes(i));
+  const add = $("add-inst");
+  add.innerHTML = '<option value="">+ Instrument</option>' +
+    missing.map(i => `<option value="${i}">${i} · ${INST_NAME[i]}</option>`).join("");
+  add.disabled = S.textMode || !missing.length;
+
+  const inst = song.insts[S.cur.row];
+  $("where").textContent = `bar ${S.cur.bar + 1} · ${sigOf(bar)} · ${inst} · step ${S.cur.step + 1}/${bar.steps}`;
+}
+
+// Do not overwrite a field while the user is typing in it.
+function setField(id, value) {
+  const el = $(id);
+  if (document.activeElement !== el && el.value !== String(value)) el.value = value;
+}
+
+const actions = {
+  click: () => { S.click = !S.click; applyVolumes(); },
+  sub: () => { S.sub = (S.sub % 4) + 1; },
+  drums: () => { S.drums = !S.drums; applyVolumes(); },
+  count: () => { S.countIn = !S.countIn; },
+  loop: () => { S.loop = !S.loop; },
+  ramp: () => { S.ramp = !S.ramp; R.loops = 0; },
+};
+for (const name of Object.keys(actions)) {
+  $("t-" + name).addEventListener("click", () => { actions[name](); renderControls(); });
+}
+$("play").addEventListener("click", togglePlay);
+document.querySelectorAll("[data-bpm]").forEach(b =>
+  b.addEventListener("click", e => setBpm(S.bpm + +b.dataset.bpm * (e.shiftKey ? 5 : 1))));
+$("bpm").addEventListener("change", e => setBpm(e.target.value));
+$("clear-sel").addEventListener("click", () => setSelection(null));
+for (const [id, key] of [["ramp-step", "rampStep"], ["ramp-every", "rampEvery"], ["ramp-max", "rampMax"]]) {
+  $(id).addEventListener("change", e => { S[key] = Math.max(1, +e.target.value || S[key]); e.target.value = S[key]; });
+}
+// Sound choices are a per-browser preference.
+const PREFS_KEY = "drums4all.prefs";
+try {
+  const prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {};
+  if (prefs.kit) S.kit = prefs.kit;  // checked against the kit list once it loads
+  if (CLICKS[prefs.clickSound]) S.clickSound = prefs.clickSound;
+} catch { /* no storage: defaults */ }
+
+function savePrefs() {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ kit: S.kit, clickSound: S.clickSound })); } catch { /* not kept */ }
+}
+
+loadManifest().then(kits => {
+  if (!kits[S.kit]) S.kit = Object.keys(kits)[0];
+  $("kit").innerHTML = Object.entries(kits).map(([k, v]) => `<option value="${k}" title="${v.credit}">${v.name}</option>`).join("");
+  $("kit").value = S.kit;
+}).catch(e => setSaveStatus("couldn't load the kit list: " + e.message, true));
+$("click-sound").innerHTML = Object.entries(CLICKS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+$("click-sound").value = S.clickSound;
+
+// Changing a sound plays a short preview when stopped.
+function preview(names) {
+  if (S.playing) return;
+  const bus = makeBus(R.ctx);
+  const t = R.ctx.currentTime + 0.05;
+  names.forEach(([name, dt, vel]) => playSound(R.ctx, bus.drums, R.sounds, name, t + dt, vel));
+}
+$("kit").addEventListener("change", async e => {
+  S.kit = e.target.value;
+  savePrefs();
+  await loadSounds();
+  preview([["kick", 0, 1], ["hh_closed", 0, 0.8], ["hh_closed", 0.2, 0.7], ["snare", 0.4, 1], ["hh_closed", 0.4, 0.8],
+    ["hh_open", 0.6, 0.7], ["kick", 0.8, 1], ["crash", 0.8, 0.8]]);
+});
+$("click-sound").addEventListener("change", async e => {
+  S.clickSound = e.target.value;
+  savePrefs();
+  await loadSounds();
+  preview([["click_accent", 0, 1], ["click", 0.35, 1], ["click", 0.7, 1]]);
+});
+
+// Buttons keep focus after a click, and Space would then press them again.
+document.addEventListener("click", e => { const b = e.target.closest("button"); if (b) b.blur(); });
+
+// ---------------------------------------------------------------- editing
+
+// All grid edits go through here: one undo step each (or merged, for typing in a field).
+function edit(fn, mergeKey = null) {
+  if (!S.song || S.textMode) return;
+  const before = S.text;
+  fn(S.song);
+  const after = serialize(S.song);
+  if (after === before) return;
+  const now = Date.now();
+  if (!(mergeKey && mergeKey === H.mergeKey && now - H.mergeTime < 1500)) {
+    H.undo.push(before);
+    if (H.undo.length > 200) H.undo.shift();
+  }
+  H.redo = [];
+  H.mergeKey = mergeKey;
+  H.mergeTime = now;
+  S.text = after;
+  changed();
+}
+
+function changed() {
+  const song = S.song;
+  S.cur.bar = Math.min(S.cur.bar, song.bars.length - 1);
+  S.cur.row = Math.min(S.cur.row, song.insts.length - 1);
+  S.cur.step = Math.min(S.cur.step, song.bars[S.cur.bar].steps - 1);
+  if (S.selection && S.selection[1] >= song.bars.length) S.selection = null;
+  const tab = lib.tabs.find(t => t.id === lib.current);
+  const title = song.title || "Untitled";
+  if (tab && tab.title !== title) { tab.title = title; renderLibrary(); }
+  renderControls();
+  renderSheetSoon();
+  saveSoon();
+}
+
+function restore(text) {
+  S.text = text;
+  try {
+    S.song = parse(text);
+    S.error = null;
+  } catch (e) {
+    S.error = e.message;
+  }
+  if (S.textMode) editor.value = text;
+  changed();
+}
+
+function undo() {
+  if (!H.undo.length) return;
+  H.redo.push(S.text);
+  H.mergeKey = null;
+  restore(H.undo.pop());
+}
+
+function redo() {
+  if (!H.redo.length) return;
+  H.undo.push(S.text);
+  H.mergeKey = null;
+  restore(H.redo.pop());
+}
+
+function curBar() { return S.song.bars[S.cur.bar]; }
+function curInst() { return S.song.insts[S.cur.row]; }
+
+function setNote(ch, advance) {
+  const { bar: bi, step } = S.cur;
+  const inst = curInst();
+  edit(song => {
+    const row = song.bars[bi].notes[inst];
+    song.bars[bi].notes[inst] = row.slice(0, step) + ch + row.slice(step + 1);
+  });
+  if (advance) moveCursor(1, 0);
+}
+
+function moveCursor(dx, dy) {
+  const song = S.song, c = S.cur;
+  c.row = Math.max(0, Math.min(song.insts.length - 1, c.row + dy));
+  c.step += dx;
+  if (c.step >= song.bars[c.bar].steps) {
+    if (c.bar < song.bars.length - 1) { c.bar++; c.step = 0; } else c.step = song.bars[c.bar].steps - 1;
+  } else if (c.step < 0) {
+    if (c.bar > 0) { c.bar--; c.step = song.bars[c.bar].steps - 1; } else c.step = 0;
+  }
+  G.reveal = true;
+  closePicker();
+  renderControls();
+}
+
+function moveBar(d) {
+  const song = S.song, c = S.cur;
+  const frac = c.step / song.bars[c.bar].steps;
+  c.bar = Math.max(0, Math.min(song.bars.length - 1, c.bar + d));
+  c.step = Math.floor(frac * song.bars[c.bar].steps);
+  G.reveal = true;
+  closePicker();
+  renderControls();
+}
+
+function emptyLike(song, bar) {
+  const notes = {};
+  for (const inst of song.insts) notes[inst] = "-".repeat(bar.steps);
+  return { steps: bar.steps, beats: bar.beats, unit: bar.unit, notes, lineBreak: false };
+}
+
+function copyOf(bar) { return { steps: bar.steps, beats: bar.beats, unit: bar.unit, notes: { ...bar.notes }, lineBreak: false }; }
+
+// Change a bar's grid, keeping every note at its position in time when it fits.
+function resample(bar, steps) {
+  for (const inst of Object.keys(bar.notes)) {
+    const out = Array(steps).fill("-");
+    [...bar.notes[inst]].forEach((ch, j) => {
+      if (ch === "-") return;
+      const k = Math.round((j * steps) / bar.steps);
+      if (k < steps && out[k] === "-") out[k] = ch;
+    });
+    bar.notes[inst] = out.join("");
+  }
+  bar.steps = steps;
+}
+
+// Change a bar's time signature keeping its subdivision per beat; beats are added or cut at the end.
+function setTimeSig(bar, beats, unit) {
+  const per = bar.steps % bar.beats ? 2 : bar.steps / bar.beats;
+  if (bar.steps % bar.beats) resample(bar, per * bar.beats);
+  const steps = per * beats;
+  for (const inst of Object.keys(bar.notes)) bar.notes[inst] = bar.notes[inst].slice(0, steps).padEnd(steps, "-");
+  Object.assign(bar, { steps, beats, unit });
+}
+
+$("bar-time").addEventListener("change", e => {
+  const [beats, unit] = parseTimeSig(e.target.value);
+  edit(song => setTimeSig(song.bars[S.cur.bar], beats, unit));
+});
+$("time-all").addEventListener("click", () => {
+  const { beats, unit } = curBar();
+  edit(song => song.bars.forEach(bar => setTimeSig(bar, beats, unit)));
+});
+$("subdiv").addEventListener("change", e => {
+  const per = +e.target.value;
+  if (!per) return;
+  const frac = S.cur.step / curBar().steps;
+  edit(song => {
+    const bar = song.bars[S.cur.bar];
+    resample(bar, per * bar.beats);
+  });
+  S.cur.step = Math.floor(frac * curBar().steps);
+  renderControls();
+});
+$("bar-add").addEventListener("click", () => {
+  edit(song => song.bars.splice(S.cur.bar + 1, 0, emptyLike(song, curBar())));
+  moveBar(1);
+});
+$("bar-dup").addEventListener("click", () => {
+  edit(song => song.bars.splice(S.cur.bar + 1, 0, copyOf(curBar())));
+  moveBar(1);
+});
+$("bar-del").addEventListener("click", deleteBar);
+$("bar-clear").addEventListener("click", () => edit(song => {
+  const bar = song.bars[S.cur.bar];
+  for (const inst of song.insts) bar.notes[inst] = "-".repeat(bar.steps);
+}));
+$("bar-break").addEventListener("click", () => edit(song => {
+  const bar = song.bars[S.cur.bar];
+  bar.lineBreak = !bar.lineBreak;
+}));
+$("bar-copy").addEventListener("click", copyBar);
+$("bar-paste").addEventListener("click", pasteBar);
+$("undo").addEventListener("click", undo);
+$("redo").addEventListener("click", redo);
+$("add-inst").addEventListener("change", e => {
+  const inst = e.target.value;
+  if (!inst) return;
+  edit(song => {
+    song.insts = ORDER.filter(i => song.insts.includes(i) || i === inst);
+    for (const bar of song.bars) bar.notes[inst] = "-".repeat(bar.steps);
+  });
+  S.cur.row = S.song.insts.indexOf(inst);
+  renderControls();
+});
+
+function deleteBar() {
+  if (S.song.bars.length < 2) return;
+  edit(song => {
+    const [removed] = song.bars.splice(S.cur.bar, 1);
+    const next = song.bars[S.cur.bar];
+    if (removed.lineBreak && next && S.cur.bar > 0) next.lineBreak = true;
+    if (song.bars[0]) song.bars[0].lineBreak = false;
+  });
+}
+
+function copyBar() {
+  S.clipboard = copyOf(curBar());
+  renderControls();
+}
+
+function pasteBar() {
+  if (!S.clipboard) return;
+  edit(song => {
+    const bar = song.bars[S.cur.bar];
+    const src = S.clipboard;
+    Object.assign(bar, { steps: src.steps, beats: src.beats, unit: src.unit });
+    for (const inst of song.insts) bar.notes[inst] = src.notes[inst] || "-".repeat(src.steps);
+  });
+}
+
+$("title").addEventListener("input", e => edit(song => { song.title = e.target.value.trim(); }, "title"));
+$("tempo").addEventListener("input", e => {
+  const v = +e.target.value;
+  if (v < 20 || v > 300) return;
+  edit(song => { song.tempo = v; }, "tempo");
+  setBpm(v);
+});
+
+// Text mode: edit the .txt directly (e.g. to paste a tab copied from drumtabs.app).
+let textBefore = null;
+$("text-mode").addEventListener("click", () => setTextMode(!S.textMode));
+editor.addEventListener("input", () => {
+  S.text = editor.value;
+  try {
+    S.song = parse(S.text);
+    S.error = null;
+    if (S.song.tempo) setBpm(S.song.tempo);
+  } catch (e) {
+    if (!(e instanceof TabError)) throw e;
+    S.error = e.message;
+  }
+  $("error").textContent = S.error || "";
+  changed();
+});
+
+function setTextMode(on) {
+  if (!on && S.error) { $("error").textContent = S.error + " — fix it before going back to the grid"; return; }
+  if (on) {
+    textBefore = S.text;
+    editor.value = S.text;
+    $("error").textContent = S.error || "";
+  } else if (textBefore !== null && textBefore !== S.text) {
+    H.undo.push(textBefore);
+    H.redo = [];
+  }
+  S.textMode = on;
+  closePicker();
+  renderControls();
+  if (on) editor.focus();
+}
+
+// ---------------------------------------------------------------- note picker
+
+const PICK = {
+  HH: [["x", "closed"], ["X", "accent"], ["o", "open"], ["O", "open acc."], ["g", "ghost"]],
+  S: [["o", "normal"], ["O", "accent"], ["g", "ghost"], ["f", "flam"], ["x", "rim"], ["X", "rim acc."]],
+  C: [["x", "normal"], ["X", "accent"]],
+  R: [["x", "normal"], ["X", "accent"], ["b", "bell"], ["B", "bell acc."]],
+  HF: [["x", "foot"], ["X", "accent"]],
+  B: [["o", "normal"], ["O", "accent"]],
+};
+const PICK_DEFAULT = [["o", "normal"], ["O", "accent"], ["g", "ghost"], ["f", "flam"]];
+const picker = $("picker");
+
+function openPicker(cell) {
+  const inst = curInst();
+  const current = curBar().notes[inst][S.cur.step];
+  const opts = [...(PICK[inst] || PICK_DEFAULT), ["-", "rest"]];
+  picker.innerHTML = `<div class="title">${INST_NAME[inst]} · bar ${S.cur.bar + 1}, step ${S.cur.step + 1}</div>` +
+    opts.map(([ch, label]) =>
+      `<button data-ch="${ch}" class="${ch === current ? "current" : ""}">` +
+      `<b class="${ch !== ch.toLowerCase() ? "acc" : ""}">${ch === "-" ? "·" : ch}</b><span>${label}</span></button>`).join("");
+  picker.classList.add("show");
+  const wrap = $("grid-wrap");
+  const left = Math.max(4, Math.min(cell.x - 10, wrap.clientWidth - picker.offsetWidth - 8));
+  picker.style.left = left + "px";
+  picker.style.top = cell.y + cell.h + 4 + "px";
+}
+
+function closePicker() { picker.classList.remove("show"); }
+
+picker.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  setNote(b.dataset.ch, false);
+  closePicker();
+  $("grid").focus({ preventScroll: true });
+});
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest("#picker, #grid")) closePicker();
+});
+
+// ---------------------------------------------------------------- keyboard
+
+const TOGGLE_KEYS = { m: "click", n: "sub", d: "drums", c: "count", l: "loop", r: "ramp" };
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); togglePlay(); return; }
+  if (e.target.closest("textarea, input, select")) return;
+  if (e.ctrlKey || e.metaKey) {
+    const k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey) undo();
+    else if (k === "y" || (k === "z" && e.shiftKey)) redo();
+    else if (k === "c" && !S.textMode) copyBar();
+    else if (k === "v" && !S.textMode) pasteBar();
+    else return;
+    e.preventDefault();
+    return;
+  }
+  if (e.altKey) return;
+  const grid = !S.textMode && S.song;
+  const k = e.key;
+  if (k === " ") togglePlay();
+  else if (k === "PageUp") setBpm(S.bpm + (e.shiftKey ? 5 : 1));
+  else if (k === "PageDown") setBpm(S.bpm - (e.shiftKey ? 5 : 1));
+  else if (k === "Escape") { if (picker.classList.contains("show")) closePicker(); else if (S.selection) setSelection(null); }
+  else if (grid && k === "ArrowRight") moveCursor(1, 0);
+  else if (grid && k === "ArrowLeft") moveCursor(-1, 0);
+  else if (grid && k === "ArrowUp") moveCursor(0, -1);
+  else if (grid && k === "ArrowDown") moveCursor(0, 1);
+  else if (grid && k === "Tab") moveBar(e.shiftKey ? -1 : 1);
+  else if (grid && k === "Home") { S.cur.step = 0; moveCursor(0, 0); }
+  else if (grid && k === "End") { S.cur.step = curBar().steps - 1; moveCursor(0, 0); }
+  else if (grid && k === "Delete") { setNote("-", false); closePicker(); }
+  else if (grid && k === "Backspace") { setNote("-", false); moveCursor(-1, 0); }
+  else if (grid && (NOTE.has(k) || k === "-" || k === ".")) { setNote(REST.has(k) ? "-" : k, true); }
+  else if (TOGGLE_KEYS[k.toLowerCase()] && !e.shiftKey) { actions[TOGGLE_KEYS[k.toLowerCase()]](); renderControls(); }
+  else return;
+  e.preventDefault();
+});
+
+// ---------------------------------------------------------------- library
+// With app.py the tabs are .txt files on the server. Without it (the page hosted as a plain static
+// site, e.g. GitHub Pages) they are kept in this browser instead, starting with the examples.
+
+let lib = { tabs: [], current: null };  // tabs: [{id, title}]
+let saveTimer = null;
+let savedText = null;
+
+async function api(method, path = "", body) {
+  const res = await fetch("api/tabs" + path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body && JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+  return res.status === 204 ? null : res.json();
+}
+
+function tabUrl(id) { return "/" + encodeURIComponent(id); }
+
+function titleOf(text) {
+  const m = /^\s*title\s*:\s*(.+?)\s*$/im.exec(text);
+  return m ? m[1] : "Untitled";
+}
+
+// Same ids as app.py: "My Groove!" -> "my-groove".
+function slugify(title) {
+  return title.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "tab";
+}
+
+const serverStore = {
+  kind: "server",
+  list: () => api("GET"),
+  get: id => api("GET", tabUrl(id)),
+  put: (id, text) => api("PUT", tabUrl(id), { text }),
+  create: text => api("POST", "", { text }),
+  remove: id => api("DELETE", tabUrl(id)),
+  // Last-chance save when the page is closed.
+  flush(id, text) {
+    fetch("api/tabs" + tabUrl(id), {
+      method: "PUT", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+    });
+  },
+};
+
+const LOCAL_KEY = "drums4all.tabs";
+const localStore = {
+  kind: "browser",
+  read() {
+    try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; } catch { return {}; }
+  },
+  write(tabs) { localStorage.setItem(LOCAL_KEY, JSON.stringify(tabs)); },  // throws if storage is blocked
+  async list() {
+    return Object.entries(this.read()).map(([id, text]) => ({ id, title: titleOf(text) }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  },
+  async get(id) {
+    const text = this.read()[id];
+    if (text === undefined) throw new Error("not found");
+    return { id, text, title: titleOf(text) };
+  },
+  async put(id, text) {
+    const tabs = this.read();
+    tabs[id] = text;
+    this.write(tabs);
+    return { id, title: titleOf(text) };
+  },
+  async create(text) {
+    const tabs = this.read();
+    const base = slugify(titleOf(text));
+    let id = base;
+    for (let n = 2; id in tabs; n++) id = `${base}-${n}`;
+    tabs[id] = text;
+    this.write(tabs);
+    return { id, title: titleOf(text) };
+  },
+  async remove(id) {
+    const tabs = this.read();
+    delete tabs[id];
+    this.write(tabs);
+  },
+  flush(id, text) { this.put(id, text); },
+};
+
+let store = serverStore;
+
+async function connectStore() {
+  try {
+    return { store: serverStore, tabs: await serverStore.list() };
+  } catch {
+    let tabs = await localStore.list();
+    if (!tabs.length) {
+      try {
+        const files = await (await fetch("static/examples/examples.json")).json();
+        for (const f of files) await localStore.create(await (await fetch("static/examples/" + f)).text());
+      } catch { /* no examples: start empty */ }
+      tabs = await localStore.list();
+    }
+    return { store: localStore, tabs };
+  }
+}
+
+function savedLabel() { return store.kind === "browser" ? "saved in this browser" : "saved"; }
+
+function setSaveStatus(text, isError = false) {
+  const el = $("save-status");
+  el.textContent = text;
+  el.classList.toggle("err", isError);
+}
+
+function saveSoon() {
+  if (!lib.current || S.text === savedText) return;
+  setSaveStatus("unsaved…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 500);
+}
+
+async function saveNow() {
+  clearTimeout(saveTimer);
+  const id = lib.current, text = S.text;
+  if (!id || text === savedText) return;
+  try {
+    const res = await store.put(id, text);
+    savedText = text;
+    const tab = lib.tabs.find(t => t.id === id);
+    if (tab && tab.title !== res.title) { tab.title = res.title; renderLibrary(); }
+    setSaveStatus(savedLabel());
+  } catch (e) {
+    setSaveStatus("couldn't save: " + e.message, true);
+    return;
+  }
+  if (lib.current === id && S.text !== savedText) saveSoon();  // edited while saving
+}
+
+function renderLibrary() {
+  const sel = $("tabs");
+  sel.innerHTML = "";
+  for (const t of lib.tabs) {
+    const o = document.createElement("option");
+    o.value = t.id;
+    o.textContent = t.title;
+    sel.appendChild(o);
+  }
+  sel.value = lib.current;
+}
+
+async function openTab(id) {
+  await saveNow();
+  let tab;
+  try {
+    tab = await store.get(id);
+  } catch (e) {
+    setSaveStatus("couldn't open: " + e.message, true);
+    return;
+  }
+  lib.current = id;
+  savedText = tab.text;
+  H.undo = [];
+  H.redo = [];
+  S.selection = null;
+  S.cur = { bar: 0, row: 0, step: 0 };
+  S.textMode = false;
+  closePicker();
+  S.text = tab.text;
+  try {
+    S.song = parse(tab.text);
+    S.error = null;
+  } catch (e) {
+    // Keep the text editable so nothing is lost; the grid needs a valid tab.
+    S.song = parse(TEMPLATE);
+    S.error = e.message;
+    textBefore = tab.text;
+    editor.value = tab.text;
+    $("error").textContent = e.message;
+    S.textMode = true;
+  }
+  if (S.song.tempo) setBpm(S.song.tempo);
+  renderLibrary();
+  changed();
+  setSaveStatus(savedLabel());
+  if (decodeURIComponent(location.hash.slice(1)) !== id) history.replaceState(null, "", "#" + encodeURIComponent(id));
+}
+
+async function addTab(text) {
+  await saveNow();
+  try {
+    const tab = await store.create(text);
+    lib.tabs.push(tab);
+    lib.tabs.sort((a, b) => a.title.localeCompare(b.title));
+    await openTab(tab.id);
+  } catch (e) {
+    setSaveStatus("couldn't create: " + e.message, true);
+  }
+}
+
+$("tabs").addEventListener("change", e => openTab(e.target.value));
+$("new").addEventListener("click", () => addTab(TEMPLATE));
+$("delete").addEventListener("click", async () => {
+  const tab = lib.tabs.find(t => t.id === lib.current);
+  if (!confirm(`Delete "${tab ? tab.title : lib.current}"?`)) return;
+  const id = lib.current;
+  clearTimeout(saveTimer);
+  try {
+    await store.remove(id);
+  } catch (e) {
+    setSaveStatus("couldn't delete: " + e.message, true);
+    return;
+  }
+  lib.tabs = lib.tabs.filter(t => t.id !== id);
+  lib.current = null;
+  if (lib.tabs.length) await openTab(lib.tabs[0].id);
+  else await addTab(TEMPLATE);
+});
+$("import").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (f) await addTab(await f.text());
+  e.target.value = "";
+});
+$("export-txt").addEventListener("click", () => download(new Blob([S.text], { type: "text/plain" }), fileName("txt")));
+$("export-wav").addEventListener("click", exportWav);
+$("export-midi").addEventListener("click", exportMidi);
+$("export-pdf").addEventListener("click", exportPdf);
+window.addEventListener("hashchange", () => {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (id && id !== lib.current && lib.tabs.some(t => t.id === id)) openTab(id);
+});
+window.addEventListener("pagehide", () => {
+  if (lib.current && S.text !== savedText) store.flush(lib.current, S.text);
+});
+
+function fileName(ext) {
+  return ((S.song && S.song.title) || "drums4all").replace(/[^\p{L}\p{N}\- ]+/gu, "").trim() + "." + ext;
+}
+
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function exportWav() {
+  if (!S.song) return;
+  await loadSounds();
+  const sr = R.ctx.sampleRate;
+  const bars = playOrder().map(bi => S.song.bars[bi]);
+  const total = bars.reduce((t, bar) => t + barDur(bar), 0);
+  const c = new OfflineAudioContext(1, Math.ceil((total + 2) * sr), sr);
+  const bus = makeBus(c);
+  bus.click.gain.value = S.click ? 0.8 : 0;
+  bus.drums.gain.value = S.drums ? 1 : 0;
+  let t = 0;
+  for (const bar of bars) {
+    const dur = barDur(bar);
+    scheduleBar(c, bus, R.sounds, bar, t, dur);
+    scheduleClicks(c, bus, R.sounds, t, dur, bar.beats, S.sub);
+    t += dur;
+  }
+  const buf = await c.startRendering();
+  download(encodeWav(buf), fileName("wav"));
+}
+
+// General MIDI drum notes (channel 10).
+const GM_NOTE = {
+  kick: 36, snare: 38, rim: 37, hh_closed: 42, hh_open: 46, hh_pedal: 44,
+  crash: 49, ride: 51, ride_bell: 53, tom_hi: 48, tom_mid: 45, tom_floor: 43,
+};
+const PPQ = 480;
+
+// Standard MIDI file (format 0) of the whole tab, with tempo, time signature changes and velocities.
+function buildMidi(song, bpm) {
+  const events = [];  // [tick, order, bytes]; order puts note-offs before note-ons on the same tick
+  const text = (type, str) => { const b = [...new TextEncoder().encode(str)]; return [0xff, type, ...varLen(b.length), ...b]; };
+  const us = Math.round(60e6 / bpm);
+  if (song.title) events.push([0, 0, text(0x03, song.title)]);
+  events.push([0, 0, [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255]]);
+  const note = (t, key, vel) => {
+    events.push([Math.max(0, t), 2, [0x99, key, vel]]);
+    events.push([Math.max(0, t) + PPQ / 8, 1, [0x89, key, 0]]);
+  };
+  let tick = 0, prev = null;
+  for (const bar of song.bars) {
+    if (sigOf(bar) !== prev) {
+      events.push([tick, 0, [0xff, 0x58, 4, bar.beats, Math.log2(bar.unit), 24, 8]]);
+      prev = sigOf(bar);
+    }
+    const barTicks = Math.round(bar.beats * (4 / bar.unit) * PPQ);
+    for (const [inst, row] of Object.entries(bar.notes)) {
+      [...row].forEach((ch, j) => {
+        if (!NOTE.has(ch)) return;
+        const [sound, vel, flam] = hitFor(inst, ch);
+        const t = tick + Math.round((j * barTicks) / bar.steps);
+        if (flam) note(t - PPQ / 16, GM_NOTE[sound], 50);
+        note(t, GM_NOTE[sound], ch.toLowerCase() === "g" ? 40 : vel >= 1 ? 120 : 90);
+      });
+    }
+    tick += barTicks;
+  }
+  events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const end = Math.max(tick, ...events.map(e => e[0]));
+  const track = [];
+  let last = 0;
+  for (const [t, , bytes] of events) { track.push(...varLen(t - last), ...bytes); last = t; }
+  track.push(...varLen(end - last), 0xff, 0x2f, 0);
+  const u32 = n => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+  return new Uint8Array([
+    ..."MThd".split("").map(c => c.charCodeAt(0)), ...u32(6), 0, 0, 0, 1, PPQ >> 8, PPQ & 255,
+    ..."MTrk".split("").map(c => c.charCodeAt(0)), ...u32(track.length), ...track,
+  ]);
+}
+
+function varLen(n) {
+  const out = [n & 0x7f];
+  while ((n >>= 7)) out.unshift((n & 0x7f) | 0x80);
+  return out;
+}
+
+function exportMidi() {
+  if (!S.song) return;
+  download(new Blob([buildMidi(S.song, S.song.tempo || S.bpm)], { type: "audio/midi" }), fileName("mid"));
+}
+
+function encodeWav(buf) {
+  const data = buf.getChannelData(0), n = data.length, sr = buf.sampleRate;
+  const v = new DataView(new ArrayBuffer(44 + n * 2));
+  const str = (o, s) => [...s].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)));
+  str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 32767, true);
+  return new Blob([v.buffer], { type: "audio/wav" });
+}
+
+// ---------------------------------------------------------------- grid editor
+
+const C = {
+  label: "#95a99f", faint: "#3a3537", dim: "#52494e", accent: "#cc8c3c", note: "#96a6c8", ghost: "#9e95c7",
+  cur: "#232323", sel: "#303540", step: "#453d41", play: "#f43841", cursorBar: "#1e1e1e", cursor: "#f4f4ff",
+  sig: "#96a6c8",
+};
+const CELL = 22, ROW_H = 24, PAD = 6, LABEL_W = 36, MARGIN = 10, NUM_H = 18, LINE_GAP = 14;
+const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono");
+const canvas = $("grid"), g = canvas.getContext("2d"), gridWrap = $("grid-wrap");
+const G = { hits: [], reveal: false, lastFollow: null };
+
+function barWidth(bar) { return bar.steps * CELL + 2 * PAD; }
+
+// Visual lines: a new line where the tab asks for one, or when the bar does not fit.
+function gridLayout(width) {
+  const lines = [];
+  let line = [], x = 0;
+  const x0 = MARGIN + LABEL_W;
+  S.song.bars.forEach((bar, bi) => {
+    const w = barWidth(bar);
+    if (line.length && (bar.lineBreak || x0 + x + w > width - MARGIN)) { lines.push(line); line = []; x = 0; }
+    line.push([bi, x0 + x]);
+    x += w;
+  });
+  if (line.length) lines.push(line);
+  return lines;
+}
+
+function drawGrid(now) {
+  const song = S.song;
+  const W = gridWrap.clientWidth;
+  const insts = song.insts;
+  const lineH = NUM_H + (insts.length + 1) * ROW_H + LINE_GAP;
+  const lines = gridLayout(W);
+  const H = Math.max(60, lines.length * lineH + 8);
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+  }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.textBaseline = "middle";
+  G.hits = [];
+
+  const playBar = now && !now.count ? now.bar : null;
+  lines.forEach((line, li) => {
+    const y = 8 + li * lineH;
+    g.font = "13px " + MONO;
+    g.textAlign = "right";
+    insts.forEach((inst, r) => {
+      g.fillStyle = !S.textMode && r === S.cur.row ? C.cursor : C.label;
+      g.fillText(inst, MARGIN + LABEL_W - 8, y + NUM_H + r * ROW_H + ROW_H / 2);
+    });
+    for (const [bi, x] of line) drawBar(bi, x, y, insts, bi === playBar ? now.frac : null);
+
+    const has = bi => line.some(([b]) => b === bi);
+    const follow = (playBar !== null && playBar !== G.lastFollow && has(playBar)) || (G.reveal && has(S.cur.bar));
+    if (follow) {
+      if (playBar !== null) G.lastFollow = playBar;
+      if (y < gridWrap.scrollTop || y + lineH > gridWrap.scrollTop + gridWrap.clientHeight - 100) {
+        gridWrap.scrollTo({ top: Math.max(0, y - 10), behavior: G.reveal ? "auto" : "smooth" });
+      }
+    }
+  });
+  G.reveal = false;
+}
+
+function drawBar(bi, x, y, insts, frac) {
+  const song = S.song;
+  const bar = song.bars[bi];
+  const prev = song.bars[bi - 1];
+  const bw = barWidth(bar);
+  const rowsY = y + NUM_H;
+  const rowsH = insts.length * ROW_H;
+  const sel = S.selection && S.selection[0] <= bi && bi <= S.selection[1];
+  const isCursorBar = !S.textMode && bi === S.cur.bar;
+
+  const bg = frac !== null ? C.cur : sel ? C.sel : isCursorBar ? C.cursorBar : null;
+  if (bg) {
+    g.fillStyle = bg;
+    g.beginPath(); g.roundRect(x, y, bw, NUM_H + rowsH + ROW_H, 4); g.fill();
+  }
+  g.font = "12px " + MONO;
+  g.textAlign = "left";
+  g.fillStyle = sel ? C.sig : C.label;
+  const num = String(bi + 1) + (sel ? " ⟲" : "");
+  g.fillText(num, x + 4, y + NUM_H / 2);
+  // Show the time signature where it changes, right after the bar number.
+  if (!prev || sigOf(prev) !== sigOf(bar)) {
+    g.fillStyle = C.sig;
+    g.fillText(sigOf(bar), x + 4 + g.measureText(num).width + 8, y + NUM_H / 2);
+  }
+  G.hits.push({ x, y, w: bw, h: NUM_H, bar: bi });
+
+  g.strokeStyle = C.faint;
+  g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(x + 0.5, rowsY + 2); g.lineTo(x + 0.5, rowsY + rowsH - 2);
+  g.moveTo(x + bw + 0.5, rowsY + 2); g.lineTo(x + bw + 0.5, rowsY + rowsH - 2);
+  g.stroke();
+
+  g.textAlign = "center";
+  const nowStep = frac !== null ? Math.floor(frac * bar.steps) : -1;
+  const perBeat = bar.steps % bar.beats ? 0 : bar.steps / bar.beats;
+  insts.forEach((inst, r) => {
+    const row = bar.notes[inst];
+    const cy = rowsY + r * ROW_H + ROW_H / 2;
+    for (let j = 0; j < bar.steps; j++) {
+      const ch = row[j];
+      const cx = x + PAD + j * CELL + CELL / 2;
+      const cell = { x: cx - CELL / 2, y: cy - ROW_H / 2, w: CELL, h: ROW_H, bar: bi, row: r, step: j };
+      G.hits.push(cell);
+      if (j === nowStep && ch !== "-") {
+        g.fillStyle = C.step;
+        g.beginPath(); g.roundRect(cell.x + 1, cell.y + 2, CELL - 2, ROW_H - 4, 3); g.fill();
+      }
+      if (isCursorBar && r === S.cur.row && j === S.cur.step) {
+        g.strokeStyle = C.cursor;
+        g.lineWidth = 2;
+        g.beginPath(); g.roundRect(cell.x + 1, cell.y + 1, CELL - 2, ROW_H - 2, 3); g.stroke();
+      }
+      if (ch === "-") {
+        const onBeat = perBeat && j % perBeat === 0;
+        g.fillStyle = onBeat ? C.dim : C.faint;
+        g.beginPath(); g.arc(cx, cy, onBeat ? 2.2 : 1.8, 0, 2 * Math.PI); g.fill();
+      } else {
+        g.font = "15px " + MONO;
+        g.fillStyle = ch !== ch.toLowerCase() ? C.accent : ch === "g" ? C.ghost : C.note;
+        g.fillText(ch, cx, cy + 1);
+      }
+    }
+  });
+
+  g.font = "11px " + MONO;
+  countLabels(bar.steps, bar.beats).forEach((label, j) => {
+    g.fillStyle = /\d/.test(label) ? C.label : C.faint;
+    g.fillText(label, x + PAD + j * CELL + CELL / 2, rowsY + rowsH + ROW_H / 2);
+  });
+
+  if (frac !== null) {
+    const px = x + PAD + frac * bar.steps * CELL + CELL / 2;
+    g.strokeStyle = C.play;
+    g.lineWidth = 2;
+    g.beginPath(); g.moveTo(px, rowsY); g.lineTo(px, rowsY + rowsH); g.stroke();
+  }
+}
+
+function hitAt(e) {
+  const r = canvas.getBoundingClientRect();
+  const px = e.clientX - r.left, py = e.clientY - r.top;
+  return G.hits.find(h => px >= h.x && px < h.x + h.w && py >= h.y && py < h.y + h.h);
+}
+
+canvas.addEventListener("click", e => {
+  if (S.textMode) return;
+  const hit = hitAt(e);
+  if (!hit) { closePicker(); return; }
+  if (hit.row === undefined) {
+    // Bar number: loop this bar (Shift extends, clicking the same one again clears).
+    const sel = S.selection;
+    if (e.shiftKey && sel) setSelection([Math.min(sel[0], hit.bar), Math.max(sel[1], hit.bar)]);
+    else if (sel && sel[0] === hit.bar && sel[1] === hit.bar) setSelection(null);
+    else setSelection([hit.bar, hit.bar]);
+    return;
+  }
+  S.cur = { bar: hit.bar, row: hit.row, step: hit.step };
+  renderControls();
+  openPicker(hit);
+});
+canvas.addEventListener("mousemove", e => { canvas.style.cursor = hitAt(e) ? "pointer" : "default"; });
+
+// ---------------------------------------------------------------- sheet music (VexFlow)
+// Drawn the way drumtabs.app does: percussion clef, one voice with every stem up (bass drum included),
+// accented snare notes and open hi-hats with x noteheads, a small italic "3" over triplets,
+// bar numbers at the start of each line.
+
+const VF = Vex.Flow;
+const POS = { C: "a/5/x2", R: "f/5/x2", HH: "g/5/x2", T1: "e/5", T2: "d/5", S: "c/5", FT: "a/4", B: "f/4", HF: "d/4/x2" };
+const PITCH = { HF: 0, B: 1, FT: 2, S: 3, T2: 4, T1: 5, R: 6, HH: 7, C: 8 };
+const QCODE = [[4, "w"], [3, "hd"], [2, "h"], [1.5, "qd"], [1, "q"], [0.75, "8d"], [0.5, "8"], [0.375, "16d"],
+  [0.25, "16"], [0.1875, "32d"], [0.125, "32"], [0.0625, "64"]];
+// Notes get extra room (SHEET_SPACING) and lines extra height (SYS_H) so the sheet is easy to read.
+const SYS_H = 125, SHEET_TOP = 30, TEMPO_PAD = 26, SHEET_SPACING = 1.6;
+const sheetEl = $("sheet");
+let sheetBoxes = [];
+let sheetTimer = null;
+
+function keyFor(inst, ch) {
+  const low = ch.toLowerCase();
+  if (inst === "S" && (low === "x" || ch === "O")) return "c/5/x2";
+  if (inst === "R" && low === "b") return "f/5/d2";
+  if (inst === "HH" && low === "o") return "g/5/x3";  // circled x
+  return POS[inst];
+}
+
+function codeFor(q) {
+  const e = QCODE.find(([v]) => Math.abs(v - q) < 1e-9);
+  return e && e[1];
+}
+
+// Split a span of steps into note values, longest first: 3 sixteenths -> [3] (dotted eighth).
+function splitSteps(steps, stepQ) {
+  const out = [];
+  let left = steps;
+  while (left > 0) {
+    let k = left;
+    while (k > 0 && !codeFor(k * stepQ)) k--;
+    if (!k) throw new Error("duration can't be written");
+    out.push(k);
+    left -= k;
+  }
+  return out;
+}
+
+function vfNote(hits, code) {
+  hits.sort((a, b) => PITCH[a[0]] - PITCH[b[0]]);
+  const note = new VF.StaveNote({ keys: hits.map(([i, ch]) => keyFor(i, ch)), duration: code, stem_direction: 1, auto_stem: false });
+  if (code.endsWith("d")) VF.Dot.buildAndAttach([note], { all: true });
+  if (hits.some(([, ch]) => ch !== ch.toLowerCase() && ch !== "F")) {
+    note.addModifier(new VF.Articulation("a>").setPosition(VF.Modifier.Position.ABOVE), 0);
+  }
+  hits.forEach(([, ch], idx) => {
+    if (ch === "g") {
+      note.addModifier(new VF.Parenthesis(VF.Modifier.Position.LEFT), idx);
+      note.addModifier(new VF.Parenthesis(VF.Modifier.Position.RIGHT), idx);
+    }
+  });
+  const flams = hits.filter(([, ch]) => ch.toLowerCase() === "f");
+  if (flams.length) {
+    const grace = new VF.GraceNote({ keys: flams.map(([i, ch]) => keyFor(i, ch)), duration: "8", slash: true, stem_direction: 1 });
+    note.addModifier(new VF.GraceNoteGroup([grace], false), 0);
+  }
+  return note;
+}
+
+function vfRest(code) {
+  const rest = new VF.StaveNote({ keys: ["b/4"], duration: code + "r", stem_direction: 1 });
+  if (code.endsWith("d")) VF.Dot.buildAndAttach([rest], { all: true });
+  return rest;
+}
+
+// One measure, one voice: everything hit at the same time is one chord with the stem up.
+function buildMeasure(song, bar) {
+  const { beats, unit } = bar;
+  const n = bar.steps;
+  if (n % beats) throw new Error("steps don't divide into beats");
+  const p = n / beats;
+  const base = 2 ** Math.floor(Math.log2(p));
+  const beatQ = 4 / unit, stepQ = beatQ / base;
+  const group = unit === 8 && beats % 3 === 0 ? 3 : 1;
+  const insts = song.insts;
+  const m = { voices: [], beams: [], tuplets: [], count: 0, graces: 0 };
+
+  if (!insts.some(i => /[^-]/.test(bar.notes[i]))) {
+    const rest = new VF.StaveNote({ keys: ["b/4"], duration: "wr", align_center: true });
+    m.voices.push(new VF.Voice({ num_beats: beats, beat_value: unit }).setMode(VF.Voice.Mode.SOFT).addTickables([rest]));
+    m.count = 1;
+    return m;
+  }
+
+  {
+    const tickables = [];
+    let groupNotes = [];
+    for (let b = 0; b < beats; b++) {
+      const hitsAt = k => insts.filter(i => NOTE.has(bar.notes[i][b * p + k])).map(i => [i, bar.notes[i][b * p + k]]);
+      const onsets = [];
+      for (let k = 0; k < p; k++) if (hitsAt(k).length) onsets.push(k);
+      const beatNotes = [];
+      if (!onsets.length || (p !== base && onsets.length === 1 && onsets[0] === 0)) {
+        // Empty beat, or a lone hit on the beat in a triplet bar: no tuplet needed.
+        const code = codeFor(beatQ);
+        beatNotes.push(onsets.length ? vfNote(hitsAt(0), code) : vfRest(code));
+      } else {
+        if (onsets[0] > 0) for (const k of splitSteps(onsets[0], stepQ)) beatNotes.push(vfRest(codeFor(k * stepQ)));
+        onsets.forEach((k, idx) => {
+          const [first, ...rests] = splitSteps((onsets[idx + 1] ?? p) - k, stepQ);
+          beatNotes.push(vfNote(hitsAt(k), codeFor(first * stepQ)));
+          for (const r of rests) beatNotes.push(vfRest(codeFor(r * stepQ)));
+        });
+        if (p !== base) {
+          // The Tuplet fixes the durations; it is not drawn. Instead a small italic number sits
+          // over the middle note, next to the accents, like drumtabs.app.
+          new VF.Tuplet(beatNotes, { num_notes: p, notes_occupied: base });
+          const label = new VF.Annotation(String(p)).setFont("Times", 12, "normal", "italic")
+            .setVerticalJustification(VF.Annotation.VerticalJustify.TOP);
+          beatNotes[Math.floor(beatNotes.length / 2)].addModifier(label, 0);
+        }
+      }
+      tickables.push(...beatNotes);
+      groupNotes.push(...beatNotes);
+      if ((b + 1) % group === 0 || b === beats - 1) {
+        m.beams.push(...VF.Beam.generateBeams(groupNotes, {
+          groups: [new VF.Fraction(group, unit)], stem_direction: 1, maintain_stem_directions: true, beam_rests: false,
+          flat_beams: true,
+        }));
+        groupNotes = [];
+      }
+    }
+    m.count = Math.max(m.count, tickables.length);
+    m.graces += tickables.filter(t => t.getModifiers().some(mod => mod instanceof VF.GraceNoteGroup)).length;
+    m.voices.push(new VF.Voice({ num_beats: beats, beat_value: unit }).setMode(VF.Voice.Mode.SOFT).addTickables(tickables));
+  }
+  return m;
+}
+
+// Measures broken into systems (lines) that fill `width`.
+// `spacing` > 1 gives every note more room (fewer bars per line), used for the PDF.
+function layoutSheet(song, width, spacing = 1) {
+  const problems = [];
+  const avail = width - 20;
+  const natural = (m, first, i) => {
+    const bar = song.bars[i], prev = song.bars[i - 1];
+    const sigChange = !prev || sigOf(prev) !== sigOf(bar);
+    return Math.max(80, 20 + (m ? (m.count * 21 + m.graces * 14) * spacing : 60)) + (first ? 38 : 0) + (sigChange ? 26 : 0);
+  };
+  const systems = [];
+  let sys = [], used = 0;
+  song.bars.forEach((bar, i) => {
+    let m = null;
+    try {
+      m = buildMeasure(song, bar);
+    } catch (e) {
+      problems.push(i + 1);
+    }
+    let w = natural(m, !sys.length, i);
+    if (sys.length && used + w > avail) {
+      systems.push(sys);
+      sys = [];
+      used = 0;
+      w = natural(m, true, i);
+    }
+    sys.push({ i, m, w });
+    used += w;
+  });
+  if (sys.length) systems.push(sys);
+  // Stretch every line to the full width, except a short last line.
+  systems.forEach((items, si) => {
+    const total = items.reduce((a, it) => a + it.w, 0);
+    const scale = si === systems.length - 1 && total < avail * 0.7 ? 1 : avail / total;
+    for (const it of items) it.w *= scale;
+  });
+  return { systems, problems };
+}
+
+function drawSheet(el, song, systems, width) {
+  const renderer = new VF.Renderer(el, VF.Renderer.Backends.SVG);
+  // Room above the first line for the tempo mark.
+  const top = SHEET_TOP + (song.tempo && systems[0] && systems[0][0].i === 0 ? TEMPO_PAD : 0);
+  renderer.resize(width, top + systems.length * SYS_H);
+  const ctx = renderer.getContext();
+  const boxes = [], problems = [];
+  systems.forEach((items, si) => {
+    let x = 10;
+    const y = top - 10 + si * SYS_H;
+    items.forEach((it, k) => {
+      const bar = song.bars[it.i], prev = song.bars[it.i - 1];
+      const stave = new VF.Stave(x, y, it.w);
+      if (k === 0) stave.addClef("percussion");
+      if (!prev || sigOf(prev) !== sigOf(bar)) stave.addTimeSignature(sigOf(bar));
+      if (k === 0 && it.i > 0) stave.setMeasure(it.i + 1);
+      if (it.i === 0 && song.tempo) stave.setTempo({ duration: "q", bpm: song.tempo }, -40);
+      if (it.i === song.bars.length - 1) stave.setEndBarType(VF.Barline.type.END);
+      stave.setContext(ctx).draw();
+      if (it.m) {
+        try {
+          new VF.Formatter().joinVoices(it.m.voices).formatToStave(it.m.voices, stave);
+          it.m.voices.forEach(v => v.draw(ctx, stave));
+          it.m.beams.forEach(b => b.setContext(ctx).draw());
+          it.m.tuplets.forEach(t => t.setContext(ctx).draw());
+        } catch (e) {
+          problems.push(it.i + 1);
+        }
+      }
+      const line0 = stave.getYForLine(0), line4 = stave.getYForLine(4);
+      boxes.push({ bar: it.i, x, y: line0 - 22, w: it.w, h: line4 - line0 + 44 });
+      x += it.w;
+    });
+  });
+  return { boxes, problems, svg: el.querySelector("svg") };
+}
+
+// A reference staff: every instrument at its place with its name underneath.
+const KEY_NOTES = [
+  ["C", "x", "crash"], ["R", "x", "ride"], ["R", "b", "bell"], ["HH", "x", "hi-hat"], ["HH", "o", "open hh"],
+  ["T1", "o", "tom 1"], ["T2", "o", "tom 2"], ["S", "o", "snare"], ["S", "x", "rim/acc."],
+  ["FT", "o", "floor"], ["B", "o", "kick"], ["HF", "x", "hh pedal"],
+];
+
+function drawKey(el, width) {
+  el.querySelectorAll("svg").forEach(x => x.remove());
+  const renderer = new VF.Renderer(el, VF.Renderer.Backends.SVG);
+  renderer.resize(width, 130);
+  const ctx = renderer.getContext();
+  const stave = new VF.Stave(10, 10, width - 20).addClef("percussion");
+  stave.setContext(ctx).draw();
+  const notes = KEY_NOTES.map(([inst, ch, name]) => {
+    const note = new VF.StaveNote({ keys: [keyFor(inst, ch)], duration: "q", stem_direction: 1, auto_stem: false });
+    note.addModifier(new VF.Annotation(name).setFont("Arial", 9).setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM), 0);
+    return note;
+  });
+  const voice = new VF.Voice({ num_beats: notes.length, beat_value: 4 }).addTickables(notes);
+  new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+  voice.draw(ctx, stave);
+  return el.querySelector("svg");
+}
+
+function renderSheetSoon() {
+  clearTimeout(sheetTimer);
+  sheetTimer = setTimeout(renderSheet, 120);
+}
+
+function renderSheet() {
+  const song = S.song;
+  if (!song) return;
+  $("sheet-title").textContent = song.title || "";
+  sheetEl.querySelectorAll("svg").forEach(s => s.remove());
+  const W = Math.max(300, sheetEl.clientWidth);
+  const layout = layoutSheet(song, W, SHEET_SPACING);
+  const drawn = drawSheet(sheetEl, song, layout.systems, W);
+  sheetBoxes = drawn.boxes;
+  drawKey($("sheet-key"), W);
+  const problems = [...new Set([...layout.problems, ...drawn.problems])];
+  $("sheet-msg").textContent = problems.length ? `Couldn't engrave bar(s) ${problems.join(", ")} as sheet music.` : "";
+}
+
+// A4 PDF: the sheet is redrawn at a fixed width and split into pages by whole lines.
+async function exportPdf() {
+  const song = S.song;
+  if (!song) return;
+  const btn = $("export-pdf");
+  btn.disabled = true;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  // A narrower drawing scaled to the page makes the notes bigger; extra spacing and line height make it easy to read.
+  const margin = 40, W = 680, scale = (pageW - 2 * margin) / W;
+  const titleH = song.title ? 44 : 0;
+  const { systems } = layoutSheet(song, W, SHEET_SPACING);
+  const holder = document.createElement("div");
+  holder.style.cssText = `position:fixed;left:-${W + 200}px;top:0;width:${W}px;background:#fff`;
+  document.body.appendChild(holder);
+  try {
+    let idx = 0;
+    for (let page = 0; idx < systems.length; page++) {
+      const room = (pageH - 2 * margin - (page === 0 ? titleH : 0)) / scale - SHEET_TOP - TEMPO_PAD;
+      const chunk = systems.slice(idx, idx + Math.max(1, Math.floor(room / SYS_H)));
+      if (page > 0) doc.addPage();
+      let y = margin;
+      if (page === 0 && song.title) {
+        doc.setFont("times", "normal");
+        doc.setFontSize(22);
+        doc.text(song.title, pageW / 2, margin + 20, { align: "center" });
+        y += titleH;
+      }
+      holder.innerHTML = "";
+      const { svg } = drawSheet(holder, song, chunk, W);
+      // svg2pdf ignores "pt" font sizes and unknown font families.
+      for (const t of svg.querySelectorAll("text")) {
+        const size = t.getAttribute("font-size") || "";
+        if (size.endsWith("pt")) t.setAttribute("font-size", (parseFloat(size) * 4) / 3);
+        t.setAttribute("font-family", "times");
+      }
+      await doc.svg(svg, { x: margin, y, width: W * scale, height: svg.height.baseVal.value * scale });
+      idx += chunk.length;
+      y += svg.height.baseVal.value * scale;
+      if (idx >= systems.length) {
+        const keyH = 130 * scale;
+        if (y + keyH + 20 > pageH - margin) { doc.addPage(); y = margin; }
+        holder.innerHTML = "";
+        const key = drawKey(holder, W);
+        for (const t of key.querySelectorAll("text")) {
+          const size = t.getAttribute("font-size") || "";
+          if (size.endsWith("pt")) t.setAttribute("font-size", (parseFloat(size) * 4) / 3);
+          t.setAttribute("font-family", "helvetica");
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(120);
+        doc.text("where each drum goes on the staff", margin + 8, y + 14);
+        await doc.svg(key, { x: margin, y: y + 18, width: W * scale, height: keyH });
+      }
+    }
+    doc.save(fileName("pdf"));
+  } finally {
+    holder.remove();
+    btn.disabled = false;
+  }
+}
+
+function placeBox(el, box) {
+  if (!box) { el.style.display = "none"; return; }
+  Object.assign(el.style, { display: "block", left: box.x + "px", top: box.y + "px", width: box.w + "px", height: box.h + "px" });
+}
+
+sheetEl.addEventListener("click", e => {
+  const r = sheetEl.getBoundingClientRect();
+  const px = e.clientX - r.left, py = e.clientY - r.top;
+  const box = sheetBoxes.find(b => px >= b.x && px < b.x + b.w && py >= b.y && py < b.y + b.h);
+  if (!box || S.textMode) return;
+  S.cur.bar = box.bar;
+  S.cur.step = Math.min(S.cur.step, curBar().steps - 1);
+  G.reveal = true;
+  renderControls();
+});
+new ResizeObserver(renderSheetSoon).observe(sheetEl);
+
+// ---------------------------------------------------------------- frame loop
+
+function frame() {
+  if (S.song) {
+    const now = nowPlaying();
+    drawGrid(now);
+    const playBar = now && !now.count ? now.bar : null;
+    placeBox($("hl-play"), sheetBoxes.find(b => b.bar === playBar));
+    placeBox($("hl-cursor"), S.textMode ? null : sheetBoxes.find(b => b.bar === S.cur.bar));
+
+    // Beat lights follow the bar being played (or the selected bar when stopped).
+    const beats = now ? now.beats : curBar().beats;
+    const beatsEl = $("beats");
+    if (beatsEl.children.length !== beats) {
+      beatsEl.innerHTML = "<i class='one'></i>" + "<i></i>".repeat(beats - 1);
+    }
+    for (let i = 0; i < beats; i++) beatsEl.children[i].classList.toggle("lit", !!now && now.beat === i);
+
+    let status = R.loading ? "loading sounds…" : "stopped";
+    if (now && now.count) status = "count-in…";
+    else if (S.playing) status = "playing" + (playBar !== null ? ` · bar ${playBar + 1}` : "");
+    if (S.selection) {
+      const [a, b] = S.selection;
+      status += ` · loop ${a + 1}${b !== a ? "–" + (b + 1) : ""}`;
+    }
+    if ($("status").textContent !== status) $("status").textContent = status;
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------- start
+
+async function init() {
+  S.song = parse(TEMPLATE);
+  S.text = TEMPLATE;
+  renderControls();
+  requestAnimationFrame(frame);
+  ({ store, tabs: lib.tabs } = await connectStore());
+  const wanted = decodeURIComponent(location.hash.slice(1));
+  if (lib.tabs.some(t => t.id === wanted)) await openTab(wanted);
+  else if (lib.tabs.length) await openTab(lib.tabs[0].id);
+  else await addTab(TEMPLATE);
+}
+
+init();
+</script>
+</body>
+</html>

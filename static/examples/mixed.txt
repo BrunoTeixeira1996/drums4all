@@ -1,0 +1,10 @@
+Title: Mixed meter with triplets
+Tempo: 90
+Time: 4/4
+# TS sets the time signature of each bar; a 12-step 4/4 bar is all triplets
+
+TS|4/4     |3/4   |4/4         |4/4     |
+ C|x-------|------|------------|--------|
+HH|--x-x-x-|x-x-x-|------------|x-x-x-x-|
+ S|----o---|--o---|oooOooOooOoo|----o---|
+ B|o-------|o---o-|o-----o-----|o---o-o-|

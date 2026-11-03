@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.wav
+# Your own tabs (the app creates this folder from static/examples on first run).
+tabs/

@@ -1,0 +1,8 @@
+Title: Waltz 3/4
+Tempo: 120
+Time: 3/4
+
+ R|x-x-x-|x-x-x-|
+ S|--o-o-|--o-o-|
+ B|o-----|o---o-|
+HF|--x-x-|--x-x-|

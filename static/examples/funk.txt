@@ -1,0 +1,14 @@
+Title: Sixteenth-note funk
+Tempo: 84
+# g = ghost note, O = accent, o on HH = open hi-hat
+
+HH|xxxxxxxxxxxxxxox|xxxxxxxxxxxxxxox|
+ S|----O--g-g--O--g|-g--O--g-g--O-g-|
+ B|o-o-----o-o-----|o--o----o-o---o-|
+
+ C|X---------------|
+HH|----------------|
+T1|--------oooo----|
+FT|------------oooo|
+ S|oooooooo--------|
+ B|o---o---o---o---|
