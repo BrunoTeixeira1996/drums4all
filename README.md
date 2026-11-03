@@ -54,6 +54,9 @@ There is no password, so only do this on your home network.
   every drum at its place (hi-hat above the staff, ride on the top line, crash above with a ledger line).
 - Metronome with subdivision (÷1 to ÷4), drums on/off (metronome only), one-bar count-in,
   loop and **speed up** automatically (+N BPM every X loops up to a maximum).
+- Repetition counter: play the tab (or the selected bars) N times and stop.
+- Practice timer: time played this session and today, and an optional countdown (any number of minutes)
+  that stops playback at the end of the bar when it runs out.
 - Saves automatically. Import/export `.txt`, export `.wav`, **export PDF** (A4 sheet music)
   and **export MIDI** (General MIDI drums on channel 10, with tempo, time signature changes and velocities:
   ghost 40, normal 90, accent 120), to open in GarageBand, MuseScore, a DAW, etc.
