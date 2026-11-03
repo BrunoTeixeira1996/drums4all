@@ -132,6 +132,7 @@
   .hl { position: absolute; pointer-events: none; border-radius: 3px; display: none; }
   #hl-play { background: #f438411a; }
   #hl-cursor { border: 1px solid #565f73; }
+  #play-line { position: absolute; pointer-events: none; display: none; width: 2px; margin-left: -1px; background: #f43841; }
   #sheet-msg { color: #c73c3f; font-size: 12px; padding: 4px 12px; }
   .legend { border-top: 1px solid var(--bg1); padding: 10px 14px 12px; color: var(--quartz); font-size: 12px; }
   .legend dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 14px; margin: 0 0 8px; }
@@ -297,7 +298,7 @@
     <div class="paper">
       <h2 id="sheet-title"></h2>
       <div id="sheet-msg"></div>
-      <div id="sheet"><div class="hl" id="hl-cursor"></div><div class="hl" id="hl-play"></div></div>
+      <div id="sheet"><div class="hl" id="hl-cursor"></div><div class="hl" id="hl-play"></div><div id="play-line"></div></div>
       <div id="sheet-key"><p>where each drum goes on the staff</p></div>
     </div>
   </section>
@@ -2011,18 +2012,31 @@ function drawSheet(el, song, systems, width) {
       if (it.i === 0 && song.tempo) stave.setTempo({ duration: "q", bpm: song.tempo }, -40);
       if (it.i === song.bars.length - 1) stave.setEndBarType(VF.Barline.type.END);
       stave.setContext(ctx).draw();
+      // Where each note sits, as [fraction of the bar, x], for the playhead.
+      const marks = [[0, stave.getNoteStartX()]];
       if (it.m) {
         try {
           new VF.Formatter().joinVoices(it.m.voices).formatToStave(it.m.voices, stave);
           it.m.voices.forEach(v => v.draw(ctx, stave));
           it.m.beams.forEach(b => b.setContext(ctx).draw());
           it.m.tuplets.forEach(t => t.setContext(ctx).draw());
+          const voice = it.m.voices[0], total = voice.getTotalTicks().value();
+          const notes = voice.getTickables();
+          if (notes.length > 1) {  // a lone whole rest is centred in the bar: keep the start instead
+            marks.length = 0;
+            let ticks = 0;
+            for (const n of notes) {
+              marks.push([ticks / total, (n.getNoteHeadBeginX() + n.getNoteHeadEndX()) / 2]);
+              ticks += n.getTicks().value();
+            }
+          }
         } catch (e) {
           problems.push(it.i + 1);
         }
       }
+      marks.push([1, stave.getNoteEndX()]);
       const line0 = stave.getYForLine(0), line4 = stave.getYForLine(4);
-      boxes.push({ bar: it.i, x, y: line0 - 22, w: it.w, h: line4 - line0 + 44 });
+      boxes.push({ bar: it.i, x, y: line0 - 22, w: it.w, h: line4 - line0 + 44, marks });
       x += it.w;
     });
   });
@@ -2137,6 +2151,17 @@ async function exportPdf() {
   }
 }
 
+// The red line moves from note to note in step with what is heard.
+function placeLine(el, box, frac) {
+  if (!box || frac === null) { el.style.display = "none"; return; }
+  const m = box.marks;
+  let k = 1;
+  while (k < m.length - 1 && m[k][0] <= frac) k++;
+  const [f0, x0] = m[k - 1], [f1, x1] = m[k];
+  const x = x0 + (f1 > f0 ? (frac - f0) / (f1 - f0) : 0) * (x1 - x0);
+  Object.assign(el.style, { display: "block", left: x + "px", top: box.y + "px", height: box.h + "px" });
+}
+
 function placeBox(el, box) {
   if (!box) { el.style.display = "none"; return; }
   Object.assign(el.style, { display: "block", left: box.x + "px", top: box.y + "px", width: box.w + "px", height: box.h + "px" });
@@ -2235,6 +2260,7 @@ function frame() {
     drawGrid(now);
     const playBar = now && !now.count ? now.bar : null;
     placeBox($("hl-play"), sheetBoxes.find(b => b.bar === playBar));
+    placeLine($("play-line"), sheetBoxes.find(b => b.bar === playBar), playBar !== null ? now.frac : null);
     placeBox($("hl-cursor"), S.textMode ? null : sheetBoxes.find(b => b.bar === S.cur.bar));
 
     // Beat lights follow the bar being played (or the selected bar when stopped).
