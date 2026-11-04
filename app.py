@@ -1,6 +1,7 @@
 """drums4all: web app to write drum tabs and practice them with a metronome.
 
-The tabs are plain .txt files in tabs/ (you can also edit them by hand).
+The tabs are plain .txt files in tabs/, optionally one folder deep
+(tabs/exercises/paradiddle.txt); you can also edit them by hand.
 The audio is generated in the browser, which is the only place that can
 play it with sample-accurate timing.
 
@@ -25,7 +26,8 @@ from flask import cli as flask_cli
 
 ROOT = Path(__file__).parent
 EXAMPLES = ROOT / "static" / "examples"
-ID_RE = re.compile(r"[\w\- ]{1,80}")
+NAME_RE = re.compile(r"[\w\- ]{1,80}")
+FOLDER_RE = re.compile(r"[\w\- ]{1,40}")
 TITLE_RE = re.compile(r"^\s*title\s*:\s*(.+?)\s*$", re.I | re.M)
 
 app = Flask(__name__, static_folder=ROOT / "static", static_url_path="/static")
@@ -47,10 +49,48 @@ def slugify(title):
     return re.sub(r"[^a-z0-9]+", "-", ascii_title.lower()).strip("-")[:40] or "tab"
 
 
+def valid_name(name, pattern=NAME_RE):
+    return bool(pattern.fullmatch(name)) and name.strip() == name
+
+
+def split_id(tab_id):
+    """"exercises/paradiddle" -> ("exercises", "paradiddle"); no folder -> ("", name)."""
+    folder, _, name = tab_id.rpartition("/")
+    if not valid_name(name) or (folder and not valid_name(folder, FOLDER_RE)):
+        return None
+    return folder, name
+
+
 def tab_path(tab_id):
-    if not ID_RE.fullmatch(tab_id) or tab_id.strip() != tab_id:
+    if not split_id(tab_id):
         abort(404)
     return tabs_dir() / f"{tab_id}.txt"
+
+
+def read_folder():
+    data = request.get_json(silent=True) or {}
+    folder = data.get("folder") or ""
+    if not isinstance(folder, str) or (folder and not valid_name(folder, FOLDER_RE)):
+        abort(400, "invalid folder name (letters, numbers, spaces, - and _)")
+    return folder
+
+
+def free_id(folder, base):
+    """The first id not taken: base, base-2, base-3..."""
+    prefix = f"{folder}/" if folder else ""
+    tab_id, n = prefix + base, 2
+    while (tabs_dir() / f"{tab_id}.txt").exists():
+        tab_id, n = f"{prefix}{base}-{n}", n + 1
+    return tab_id
+
+
+def remove_if_empty(folder_path):
+    if folder_path != tabs_dir() and not any(folder_path.iterdir()):
+        folder_path.rmdir()
+
+
+def tab_info(tab_id, text):
+    return {"id": tab_id, "title": title_of(text), "folder": split_id(tab_id)[0]}
 
 
 def read_text_field():
@@ -71,7 +111,7 @@ def write_atomic(path, text):
 def seed():
     """On first run, start with the examples."""
     tabs_dir().mkdir(parents=True, exist_ok=True)
-    if not any(tabs_dir().glob("*.txt")):
+    if not any(tabs_dir().glob("*.txt")) and not any(tabs_dir().glob("*/*.txt")):
         for f in EXAMPLES.glob("*.txt"):
             shutil.copy(f, tabs_dir() / f.name)
 
@@ -84,49 +124,66 @@ def index():
 @app.get("/api/tabs")
 def list_tabs():
     tabs = []
-    for p in tabs_dir().glob("*.txt"):
-        if ID_RE.fullmatch(p.stem):
-            tabs.append({"id": p.stem, "title": title_of(p.read_text(encoding="utf-8", errors="replace"))})
-    tabs.sort(key=lambda t: t["title"].lower())
+    for p in [*tabs_dir().glob("*.txt"), *tabs_dir().glob("*/*.txt")]:
+        tab_id = p.relative_to(tabs_dir()).with_suffix("").as_posix()
+        if split_id(tab_id):
+            tabs.append(tab_info(tab_id, p.read_text(encoding="utf-8", errors="replace")))
+    tabs.sort(key=lambda t: (t["folder"].lower(), t["title"].lower()))
     return jsonify(tabs)
 
 
-@app.get("/api/tabs/<tab_id>")
+@app.get("/api/tabs/<path:tab_id>")
 def get_tab(tab_id):
     path = tab_path(tab_id)
     if not path.exists():
         abort(404)
     text = path.read_text(encoding="utf-8", errors="replace")
-    return jsonify({"id": tab_id, "title": title_of(text), "text": text})
+    return jsonify({**tab_info(tab_id, text), "text": text})
 
 
-@app.put("/api/tabs/<tab_id>")
+@app.put("/api/tabs/<path:tab_id>")
 def save_tab(tab_id):
     path = tab_path(tab_id)
     if not path.exists():
         abort(404)
     text = read_text_field()
     write_atomic(path, text)
-    return jsonify({"id": tab_id, "title": title_of(text)})
+    return jsonify(tab_info(tab_id, text))
 
 
 @app.post("/api/tabs")
 def create_tab():
     text = read_text_field()
-    base = slugify(title_of(text))
-    tab_id, n = base, 2
-    while (tabs_dir() / f"{tab_id}.txt").exists():
-        tab_id, n = f"{base}-{n}", n + 1
+    folder = read_folder()
+    tab_id = free_id(folder, slugify(title_of(text)))
+    (tabs_dir() / folder).mkdir(parents=True, exist_ok=True)
     write_atomic(tabs_dir() / f"{tab_id}.txt", text)
-    return jsonify({"id": tab_id, "title": title_of(text)}), 201
+    return jsonify(tab_info(tab_id, text)), 201
 
 
-@app.delete("/api/tabs/<tab_id>")
+@app.post("/api/tabs/<path:tab_id>/move")
+def move_tab(tab_id):
+    """Put a tab in another folder ("" = no folder). Returns its new id."""
+    path = tab_path(tab_id)
+    if not path.exists():
+        abort(404)
+    folder = read_folder()
+    if folder == split_id(tab_id)[0]:
+        return jsonify(tab_info(tab_id, path.read_text(encoding="utf-8", errors="replace")))
+    new_id = free_id(folder, split_id(tab_id)[1])
+    (tabs_dir() / folder).mkdir(parents=True, exist_ok=True)
+    os.replace(path, tabs_dir() / f"{new_id}.txt")
+    remove_if_empty(path.parent)
+    return jsonify(tab_info(new_id, (tabs_dir() / f"{new_id}.txt").read_text(encoding="utf-8", errors="replace")))
+
+
+@app.delete("/api/tabs/<path:tab_id>")
 def delete_tab(tab_id):
     path = tab_path(tab_id)
     if not path.exists():
         abort(404)
     path.unlink()
+    remove_if_empty(path.parent)
     return "", 204
 
 

@@ -87,6 +87,7 @@
   #clear-sel { display: none; }
   #clear-sel.show { display: inline-block; }
   #tabs { max-width: 240px; }
+  #folder { width: 110px; }
   #title { width: 200px; }
   #tempo { width: 62px; }
   #save-status { color: var(--niagara-1); font-size: 12px; }
@@ -200,7 +201,10 @@
   <div class="group">
     <span class="label">tab</span>
     <select id="tabs" aria-label="Saved tabs"></select>
-    <button id="new">New</button>
+    <label class="field" title="Folder of this tab: type a name to move it there (empty = no folder)">folder
+      <input id="folder" list="folder-list" placeholder="none" autocomplete="off"></label>
+    <datalist id="folder-list"></datalist>
+    <button id="new" title="New tab in this folder">New</button>
     <button id="delete">Delete</button>
     <button id="import">Import .txt</button>
     <button id="export-txt">Export .txt</button>
@@ -816,9 +820,11 @@ function nowPlaying() {
 
 // ---------------------------------------------------------------- controls
 
-function setBpm(v) {
+// `remember`: keep it as this tab's BPM, so the tab opens where practice left off.
+function setBpm(v, remember = true) {
   S.bpm = Math.round(Math.max(20, Math.min(300, +v || S.bpm)));
   $("bpm").value = S.bpm;
+  if (remember) rememberBpm();
 }
 
 function setSelection(sel) {
@@ -1190,9 +1196,10 @@ $("text-mode").addEventListener("click", () => setTextMode(!S.textMode));
 editor.addEventListener("input", () => {
   S.text = editor.value;
   try {
+    const before = S.song && S.song.tempo;
     S.song = parse(S.text);
     S.error = null;
-    if (S.song.tempo) setBpm(S.song.tempo);
+    if (S.song.tempo && S.song.tempo !== before) setBpm(S.song.tempo);  // only when the Tempo line changes
   } catch (e) {
     if (!(e instanceof TabError)) throw e;
     S.error = e.message;
@@ -1303,7 +1310,7 @@ document.addEventListener("keydown", e => {
 // With app.py the tabs are .txt files on the server. Without it (the page hosted as a plain static
 // site, e.g. GitHub Pages) they are kept in this browser instead, starting with the examples.
 
-let lib = { tabs: [], current: null };  // tabs: [{id, title}]
+let lib = { tabs: [], current: null };  // tabs: [{id, title, folder}]; ids are "name" or "folder/name"
 let saveTimer = null;
 let savedText = null;
 
@@ -1317,7 +1324,25 @@ async function api(method, path = "", body) {
   return res.status === 204 ? null : res.json();
 }
 
-function tabUrl(id) { return "/" + encodeURIComponent(id); }
+function tabUrl(id) { return "/" + id.split("/").map(encodeURIComponent).join("/"); }
+const folderOf = id => (id.includes("/") ? id.slice(0, id.lastIndexOf("/")) : "");
+const nameOf = id => id.slice(id.lastIndexOf("/") + 1);
+const FOLDER_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u;  // same as app.py
+const byFolderTitle = (a, b) => a.folder.localeCompare(b.folder) || a.title.localeCompare(b.title);
+
+// The last BPM used on each tab, per browser.
+const BPM_KEY = "drums4all.bpm";
+function keptBpms() {
+  try { return JSON.parse(localStorage.getItem(BPM_KEY)) || {}; } catch { return {}; }
+}
+function keepBpms(fn) {
+  const all = keptBpms();
+  fn(all);
+  try { localStorage.setItem(BPM_KEY, JSON.stringify(all)); } catch { /* not kept */ }
+}
+function rememberBpm() {
+  if (lib.current && keptBpms()[lib.current] !== S.bpm) keepBpms(all => { all[lib.current] = S.bpm; });
+}
 
 function titleOf(text) {
   const m = /^\s*title\s*:\s*(.+?)\s*$/im.exec(text);
@@ -1335,7 +1360,8 @@ const serverStore = {
   list: () => api("GET"),
   get: id => api("GET", tabUrl(id)),
   put: (id, text) => api("PUT", tabUrl(id), { text }),
-  create: text => api("POST", "", { text }),
+  create: (text, folder) => api("POST", "", { text, folder }),
+  move: (id, folder) => api("POST", tabUrl(id) + "/move", { folder }),
   remove: id => api("DELETE", tabUrl(id)),
   // Last-chance save when the page is closed.
   flush(id, text) {
@@ -1352,29 +1378,42 @@ const localStore = {
     try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; } catch { return {}; }
   },
   write(tabs) { localStorage.setItem(LOCAL_KEY, JSON.stringify(tabs)); },  // throws if storage is blocked
+  info: (id, text) => ({ id, title: titleOf(text), folder: folderOf(id) }),
+  freeId(tabs, folder, base) {
+    const prefix = folder ? folder + "/" : "";
+    let id = prefix + base;
+    for (let n = 2; id in tabs; n++) id = `${prefix}${base}-${n}`;
+    return id;
+  },
   async list() {
-    return Object.entries(this.read()).map(([id, text]) => ({ id, title: titleOf(text) }))
-      .sort((a, b) => a.title.localeCompare(b.title));
+    return Object.entries(this.read()).map(([id, text]) => this.info(id, text)).sort(byFolderTitle);
   },
   async get(id) {
     const text = this.read()[id];
     if (text === undefined) throw new Error("not found");
-    return { id, text, title: titleOf(text) };
+    return { ...this.info(id, text), text };
   },
   async put(id, text) {
     const tabs = this.read();
     tabs[id] = text;
     this.write(tabs);
-    return { id, title: titleOf(text) };
+    return this.info(id, text);
   },
-  async create(text) {
+  async create(text, folder = "") {
     const tabs = this.read();
-    const base = slugify(titleOf(text));
-    let id = base;
-    for (let n = 2; id in tabs; n++) id = `${base}-${n}`;
+    const id = this.freeId(tabs, folder, slugify(titleOf(text)));
     tabs[id] = text;
     this.write(tabs);
-    return { id, title: titleOf(text) };
+    return this.info(id, text);
+  },
+  async move(id, folder) {
+    const tabs = this.read();
+    if (folderOf(id) === folder) return this.info(id, tabs[id]);
+    const to = this.freeId(tabs, folder, nameOf(id));
+    tabs[to] = tabs[id];
+    delete tabs[id];
+    this.write(tabs);
+    return this.info(to, tabs[to]);
   },
   async remove(id) {
     const tabs = this.read();
@@ -1434,16 +1473,24 @@ async function saveNow() {
   if (lib.current === id && S.text !== savedText) saveSoon();  // edited while saving
 }
 
+// Tabs without a folder first, then one group per folder.
 function renderLibrary() {
   const sel = $("tabs");
   sel.innerHTML = "";
-  for (const t of lib.tabs) {
-    const o = document.createElement("option");
-    o.value = t.id;
-    o.textContent = t.title;
-    sel.appendChild(o);
+  const folders = [...new Set(lib.tabs.map(t => t.folder))].sort((a, b) => a.localeCompare(b));
+  for (const folder of folders) {
+    const parent = folder ? sel.appendChild(document.createElement("optgroup")) : sel;
+    if (folder) parent.label = folder;
+    for (const t of lib.tabs.filter(t => t.folder === folder)) {
+      const o = document.createElement("option");
+      o.value = t.id;
+      o.textContent = t.title;
+      parent.appendChild(o);
+    }
   }
   sel.value = lib.current;
+  $("folder-list").innerHTML = folders.filter(Boolean).map(f => `<option value="${f}">`).join("");
+  setField("folder", lib.current ? folderOf(lib.current) : "");
 }
 
 async function openTab(id) {
@@ -1476,19 +1523,21 @@ async function openTab(id) {
     $("error").textContent = e.message;
     S.textMode = true;
   }
-  if (S.song.tempo) setBpm(S.song.tempo);
+  const kept = keptBpms()[id];
+  if (kept || S.song.tempo) setBpm(kept || S.song.tempo, false);
   renderLibrary();
   changed();
   setSaveStatus(savedLabel());
-  if (decodeURIComponent(location.hash.slice(1)) !== id) history.replaceState(null, "", "#" + encodeURIComponent(id));
+  if (decodeURIComponent(location.hash.slice(1)) !== id) history.replaceState(null, "", "#" + tabUrl(id).slice(1));
 }
 
-async function addTab(text) {
+// New and imported tabs go in the folder of the tab that is open.
+async function addTab(text, folder = lib.current ? folderOf(lib.current) : "") {
   await saveNow();
   try {
-    const tab = await store.create(text);
+    const tab = await store.create(text, folder);
     lib.tabs.push(tab);
-    lib.tabs.sort((a, b) => a.title.localeCompare(b.title));
+    lib.tabs.sort(byFolderTitle);
     await openTab(tab.id);
   } catch (e) {
     setSaveStatus("couldn't create: " + e.message, true);
@@ -1496,6 +1545,29 @@ async function addTab(text) {
 }
 
 $("tabs").addEventListener("change", e => openTab(e.target.value));
+$("folder").addEventListener("change", async e => {
+  const folder = e.target.value.trim();
+  const id = lib.current;
+  if (!id || folder === folderOf(id)) { e.target.value = id ? folderOf(id) : ""; return; }
+  if (folder && !FOLDER_RE.test(folder)) {
+    setSaveStatus("folder names: letters, numbers, spaces, - and _", true);
+    e.target.value = folderOf(id);
+    return;
+  }
+  await saveNow();
+  try {
+    const tab = await store.move(id, folder);
+    lib.tabs = lib.tabs.filter(t => t.id !== id).concat(tab).sort(byFolderTitle);
+    lib.current = tab.id;
+    keepBpms(all => { if (id in all) { all[tab.id] = all[id]; delete all[id]; } });
+    history.replaceState(null, "", "#" + tabUrl(tab.id).slice(1));
+    renderLibrary();
+    setSaveStatus(folder ? `moved to ${folder}` : "moved out of the folder");
+  } catch (err) {
+    setSaveStatus("couldn't move: " + err.message, true);
+    e.target.value = folderOf(id);
+  }
+});
 $("new").addEventListener("click", () => addTab(TEMPLATE));
 $("delete").addEventListener("click", async () => {
   const tab = lib.tabs.find(t => t.id === lib.current);
@@ -1509,6 +1581,7 @@ $("delete").addEventListener("click", async () => {
     return;
   }
   lib.tabs = lib.tabs.filter(t => t.id !== id);
+  keepBpms(all => { delete all[id]; });
   lib.current = null;
   if (lib.tabs.length) await openTab(lib.tabs[0].id);
   else await addTab(TEMPLATE);

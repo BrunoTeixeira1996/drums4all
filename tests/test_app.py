@@ -35,6 +35,29 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.client.delete("/api/tabs/my-groove-c").status_code, 204)
         self.assertEqual(self.client.get("/api/tabs/my-groove-c").status_code, 404)
 
+    def test_folders(self):
+        r = self.client.post("/api/tabs", json={"text": "Title: Singles\nS|o-o-|\n", "folder": "exercises"})
+        self.assertEqual(r.json, {"id": "exercises/singles", "title": "Singles", "folder": "exercises"})
+        self.assertTrue((Path(self.tmp.name) / "exercises" / "singles.txt").exists())
+        listed = {t["id"]: t["folder"] for t in self.client.get("/api/tabs").json}
+        self.assertEqual(listed["exercises/singles"], "exercises")
+        self.assertEqual(listed["rock"], "")
+        self.assertEqual(self.client.get("/api/tabs/exercises/singles").json["text"], "Title: Singles\nS|o-o-|\n")
+        self.assertEqual(self.client.put("/api/tabs/exercises/singles", json={"text": "Title: Singles\n"}).status_code, 200)
+
+        # moving keeps the name, avoids clashes and removes the folder once empty
+        self.assertEqual(self.client.post("/api/tabs/rock/move", json={"folder": "grooves"}).json["id"], "grooves/rock")
+        self.assertEqual(self.client.post("/api/tabs/exercises/singles/move", json={"folder": ""}).json["id"], "singles")
+        self.assertFalse((Path(self.tmp.name) / "exercises").exists())
+        self.client.post("/api/tabs", json={"text": "Title: Rock\n"})
+        self.assertEqual(self.client.post("/api/tabs/rock/move", json={"folder": "grooves"}).json["id"], "grooves/rock-2")
+
+        self.assertEqual(self.client.delete("/api/tabs/grooves/rock").status_code, 204)
+        self.assertEqual(self.client.post("/api/tabs/singles/move", json={"folder": "../x"}).status_code, 400)
+        self.assertEqual(self.client.post("/api/tabs", json={"text": "", "folder": "a/b"}).status_code, 400)
+        self.assertEqual(self.client.get("/api/tabs/a/b/c").status_code, 404)
+        self.assertEqual(self.client.get("/api/tabs/../app").status_code, 404)
+
     def test_rejects_bad_input(self):
         self.assertEqual(self.client.put("/api/tabs/rock", json={"nope": 1}).status_code, 400)
         self.assertEqual(self.client.put("/api/tabs/nao-existe", json={"text": ""}).status_code, 404)
