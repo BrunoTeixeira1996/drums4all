@@ -47,6 +47,7 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - `static/index.html`: the whole front end, one file, sections marked `// ------ name`:
   tab model (parse/serialize), sounds, scheduling, state, transport, controls, editing, note picker, keyboard,
   library (serverStore / localStore), exports (wav, MIDI, PDF), grid editor (canvas), sheet music (VexFlow), frame loop.
+- While playing, the sheet pane scrolls with the red line (`followSheet`), like the grid does (the user asked).
 - `static/examples/*.txt` + `examples.json` (list used by the static-site mode).
 - `static/kits/gmrock/<sound>-<0..3>.flac` + `kits.json`: the one sampled kit, 4 velocity layers (ghost, soft,
   normal, accent). Rebuild with `tools/build_kits.py <dir with GMRockKit/>` (ffmpeg + numpy). Source: Hydrogen

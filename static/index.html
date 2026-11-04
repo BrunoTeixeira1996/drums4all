@@ -2176,6 +2176,21 @@ async function exportPdf() {
 }
 
 // The red line moves from note to note in step with what is heard.
+// While playing, the sheet scrolls down with the red line, like the grid does.
+let sheetFollowed = null;
+function followSheet(playBar) {
+  if (playBar === sheetFollowed) return;
+  sheetFollowed = playBar;
+  const box = sheetBoxes.find(b => b.bar === playBar);
+  const pane = $("sheet-pane");
+  if (!box || pane.scrollHeight <= pane.clientHeight) return;
+  const top = sheetEl.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop + box.y;
+  if (top < pane.scrollTop || top + box.h > pane.scrollTop + pane.clientHeight - 100) {
+    const firstLine = box.y === Math.min(...sheetBoxes.map(b => b.y));  // show the title too
+    pane.scrollTo({ top: firstLine ? 0 : Math.max(0, top - 40), behavior: "smooth" });
+  }
+}
+
 function placeLine(el, box, frac) {
   if (!box || frac === null) { el.style.display = "none"; return; }
   const m = box.marks;
@@ -2269,6 +2284,7 @@ function frame() {
     const playBar = now && !now.count ? now.bar : null;
     placeBox($("hl-play"), sheetBoxes.find(b => b.bar === playBar));
     placeLine($("play-line"), sheetBoxes.find(b => b.bar === playBar), playBar !== null ? now.frac : null);
+    followSheet(playBar);
     placeBox($("hl-cursor"), S.textMode ? null : sheetBoxes.find(b => b.bar === S.cur.bar));
 
     // Beat lights follow the bar being played (or the selected bar when stopped).
