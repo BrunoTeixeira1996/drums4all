@@ -50,7 +50,7 @@ to `http://<computer-ip>:8484`.
   hi-hat…), or type it.
 - Sticking (`R`, `L`, `U` for both hands) under the notes.
 - Any time signature and subdivision per bar (a single 3/4 bar, triplets, 16ths…).
-- Real recorded drum kits, and a metronome with count-in, loop and automatic speed up.
+- A real recorded drum kit, and a metronome with count-in, loop and automatic speed up, each with its own volume.
 - Stop by itself after N times through the tab, or after N minutes.
 - Each tab remembers the BPM you last practised it at.
 - Export to PDF, MIDI, WAV and `.txt`.
@@ -82,8 +82,6 @@ python3 -m venv .venv
 
 ## Third-party material
 
-- Drum samples:
-  - Pearl and Tama kits: AVL Drumkits *Black Pearl 2023* and *Blonde Bop* by Glen MacArthur, CC BY-SA.
-  - GM Rock kit: Hydrogen *GMRockKit* by Glen MacArthur / Sebastian Moors, GPL.
+- Drum samples: Hydrogen *GMRockKit* by Glen MacArthur / Sebastian Moors, GPL.
 - [VexFlow](https://www.vexflow.com/) 4.2.3 (MIT), [jsPDF](https://github.com/parallax/jsPDF) 2.5.1 (MIT),
   [svg2pdf.js](https://github.com/yWorks/svg2pdf.js) 2.2.3 (MIT).

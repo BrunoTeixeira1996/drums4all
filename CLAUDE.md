@@ -44,10 +44,10 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
   tab model (parse/serialize), sounds, scheduling, state, transport, controls, editing, note picker, keyboard,
   library (serverStore / localStore), exports (wav, MIDI, PDF), grid editor (canvas), sheet music (VexFlow), frame loop.
 - `static/examples/*.txt` + `examples.json` (list used by the static-site mode).
-- `static/kits/<kit>/<sound>-<0..3>.flac` + `kits.json`: sampled kits, 4 velocity layers (ghost, soft, normal,
-  accent). Rebuild with `tools/build_kits.py <dir with extracted Hydrogen kits>` (ffmpeg + numpy). Sources:
-  AVL Drumkits Black Pearl 2023 and Blonde Bop (CC BY-SA), Hydrogen GMRockKit (GPL). Samples are trimmed to start
-  at the attack (≤ 2 ms), or they sound late.
+- `static/kits/gmrock/<sound>-<0..3>.flac` + `kits.json`: the one sampled kit, 4 velocity layers (ghost, soft,
+  normal, accent). Rebuild with `tools/build_kits.py <dir with GMRockKit/>` (ffmpeg + numpy). Source: Hydrogen
+  GMRockKit (GPL). Samples are trimmed to start at the attack (≤ 2 ms), or they sound late. The user removed the
+  other kits (Pearl, Tama) and the kit menu: only GM Rock, no kit choice.
 - `static/vendor/`: VexFlow 4.2.3, jsPDF 2.5.1, svg2pdf.js 2.2.3 (kept local, offline).
 - `start.sh` / `start.command` / `start.bat`: double-click launchers for non-technical users
   (create `.venv`, `pip install -r requirements.txt`, `app.py --open`). The `.bat` and `.command` were never run on
@@ -80,13 +80,12 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - **Look**: background `#181818`, rexim's Gruber Darker colours **without the yellow** (niagara blue-grey for
   notes/active, brown for accents, wisteria for ghosts, green play, red stop/playhead), monospace UI, flat and calm,
   "not AI-looking". Sheet on a light paper.
-- **Sounds**: real recorded acoustic kits (the user disliked synthesized drums). The metronome sounds are synthesized
-  (beep, woodblock, cowbell).
+- **Sounds**: a real recorded acoustic kit (the user disliked synthesized drums). The metronome is a synthesized beep
+  only (the user removed the woodblock/cowbell choice: keep it simple).
 - Name **drums4all**; README credits drumtabs.app as the inspiration (author unknown, Ko-fi `treefordev`).
 
 ## Ideas not done yet
 
 - Triplets/subdivision per beat (today it's per bar).
 - Rimshot vs accent look the same on the snare in the sheet (both x + `>`), on purpose like drumtabs.
-- Pearl/Tama kits have no fully open hi-hat sample (semi-open is used) and one rack tom (tom 2 is it pitched down).
 - Launchers untested on Windows/macOS; static hosting only tested locally (sub-folder served by `http.server`).

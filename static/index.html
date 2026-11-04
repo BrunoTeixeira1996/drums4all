@@ -58,7 +58,7 @@
   .brand { color: var(--niagara); font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
   .brand span { color: var(--quartz); font-weight: 400; }
   .group { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-  #kit, #click-sound { max-width: 130px; }
+  input.vol { width: 72px; padding: 0; border: 0; background: transparent; accent-color: var(--niagara); }
   .sep { width: 1px; align-self: stretch; background: var(--bg1); }
   #play { min-width: 84px; font-weight: 700; background: var(--green); color: var(--bg-1); border-color: var(--green); }
   #play:hover { filter: brightness(1.08); }
@@ -175,8 +175,10 @@
       <input id="ramp-max" type="number" min="20" max="300" value="200"></span>
   </div>
   <div class="group">
-    <label class="field">kit <select id="kit" title="Drum sounds"></select></label>
-    <label class="field">click <select id="click-sound" title="Metronome sound"></select></label>
+    <span class="unit">drums</span>
+    <input id="drums-vol" class="vol" type="range" min="0" max="150" step="5" value="100" aria-label="Drums volume">
+    <span class="unit">click</span>
+    <input id="click-vol" class="vol" type="range" min="0" max="150" step="5" value="100" aria-label="Metronome volume">
   </div>
   <div class="group" title="Stop by itself after playing the tab (or the loop) this many times, or after this many minutes of playing. Empty = keep going">
     <label class="field">stop after <input id="limit" type="number" min="0" max="999" step="1" placeholder="never"></label>
@@ -512,46 +514,16 @@ function countLabels(steps, beats) {
 
 // ---------------------------------------------------------------- sounds
 // Drums are recorded samples (static/kits, built by tools/build_kits.py) with four velocity layers
-// each: ghost, soft, normal, accent. The metronome sounds are synthesized.
+// each: ghost, soft, normal, accent. The metronome is a synthesized beep.
 
-const CLICKS = { beep: "Beep", wood: "Woodblock", cowbell: "Cowbell" };
-
-function synth(sr) {
-  const N = d => Math.floor(sr * d);
-  const gen = (d, f) => { const a = new Float32Array(N(d)); for (let i = 0; i < a.length; i++) a[i] = f(i / sr, i); return a; };
-  const noise = d => gen(d, () => Math.random() * 2 - 1);
-  const hp = (x, passes = 1) => {
-    for (let p = 0; p < passes; p++) { let prev = 0; for (let i = 0; i < x.length; i++) { const v = x[i]; x[i] = v - prev; prev = v; } }
+// Short sine beeps: high on beat 1, lower on the other beats, quiet for the subdivisions.
+function makeClicks(sr) {
+  const beep = (f, gain) => {
+    const x = new Float32Array(Math.floor(sr * 0.04));
+    for (let i = 0; i < x.length; i++) x[i] = gain * Math.sin(2 * Math.PI * f * i / sr) * Math.exp(-i / sr * 120);
     return x;
   };
-  // One-pole low-pass: a in (0, 1], smaller is darker.
-  const lp = (x, a) => { let y = 0; for (let i = 0; i < x.length; i++) { y += a * (x[i] - y); x[i] = y; } return x; };
-  const norm = (x, gain) => {
-    let m = 0;
-    for (const v of x) m = Math.max(m, Math.abs(v));
-    const s = m ? gain / m : 0;
-    for (let i = 0; i < x.length; i++) x[i] *= s;
-    return x;
-  };
-  const sweep = (f0, f1, d, speed) => {
-    let ph = 0;
-    return gen(d, t => { ph += 2 * Math.PI * (f1 + (f0 - f1) * Math.exp(-t * speed)) / sr; return Math.sin(ph); });
-  };
-  return { sr, N, gen, noise, hp, lp, norm, sweep, TAU: 2 * Math.PI };
-}
-
-function makeClicks(sr, kind) {
-  const { gen, noise, hp, lp, norm, TAU } = synth(sr);
-  const beep = (f, gain) => norm(gen(0.04, t => Math.sin(TAU * f * t) * Math.exp(-t * 120)), gain);
-  const wood = (f, gain) => {
-    const nz = hp(noise(0.06));
-    return norm(gen(0.06, (t, i) =>
-      (Math.sin(TAU * f * t) * 0.7 + Math.sin(TAU * f * 2.3 * t) * 0.3) * Math.exp(-t * 90) + nz[i] * Math.exp(-t * 900) * 0.3), gain);
-  };
-  const cowbell = (f, gain) => lp(norm(gen(0.25, t =>
-    (Math.sign(Math.sin(TAU * f * t)) + Math.sign(Math.sin(TAU * f * 1.48 * t))) * Math.exp(-t * 14)), gain), 0.35);
-  const [make, hi, lo] = { beep: [beep, 1600, 1000], wood: [wood, 1900, 1300], cowbell: [cowbell, 800, 560] }[kind];
-  return { click_accent: make(hi, 0.9), click: make(lo, 0.7), click_sub: make(lo * 0.8, 0.35) };
+  return { click_accent: beep(1600, 0.9), click: beep(1000, 0.7), click_sub: beep(800, 0.35) };
 }
 
 const soundCache = {};
@@ -583,13 +555,13 @@ async function loadSounds() {
   ensureAudio();
   const kits = await loadManifest();
   if (!kits[S.kit]) S.kit = Object.keys(kits)[0];
-  const kit = S.kit, kitKey = "kit:" + kit, clickKey = "click:" + S.clickSound;
+  const kit = S.kit, kitKey = "kit:" + kit, clickKey = "click";
   if (!soundCache[kitKey]) {
     soundCache[kitKey] = Promise.all(Object.entries(kits[kit].sounds).map(async ([name, files]) =>
       [name, await Promise.all(files.map(fetchSample))])).then(Object.fromEntries);
     soundCache[kitKey].catch(() => { delete soundCache[kitKey]; });
   }
-  soundCache[clickKey] = soundCache[clickKey] || toBuffers(R.ctx.sampleRate, makeClicks(R.ctx.sampleRate, S.clickSound));
+  soundCache[clickKey] = soundCache[clickKey] || toBuffers(R.ctx.sampleRate, makeClicks(R.ctx.sampleRate));
   R.loading = true;
   try {
     const drums = await soundCache[kitKey];
@@ -692,7 +664,8 @@ const S = {
   selection: null, playing: false,
   cur: { bar: 0, row: 0, step: 0 },
   clipboard: null,
-  kit: "pearl", clickSound: "beep",
+  kit: "gmrock",  // the only kit in static/kits/kits.json
+  drumsVol: 100, clickVol: 100,  // percent
   limit: 0,     // stop after this many times / minutes, 0 = never
   limitUnit: "times",
 };
@@ -721,11 +694,15 @@ function ensureAudio() {
   if (R.ctx.state === "suspended") R.ctx.resume();
 }
 
+function levels() {
+  return { click: S.click ? 0.8 * S.clickVol / 100 : 0, drums: S.drums ? S.drumsVol / 100 : 0 };
+}
+
 function applyVolumes() {
   if (!R.bus) return;
-  const t = R.ctx.currentTime;
-  R.bus.click.gain.setTargetAtTime(S.click ? 0.8 : 0, t, 0.01);
-  R.bus.drums.gain.setTargetAtTime(S.drums ? 1 : 0, t, 0.01);
+  const t = R.ctx.currentTime, l = levels();
+  R.bus.click.gain.setTargetAtTime(l.click, t, 0.01);
+  R.bus.drums.gain.setTargetAtTime(l.drums, t, 0.01);
 }
 
 async function play() {
@@ -900,48 +877,47 @@ $("clear-sel").addEventListener("click", () => setSelection(null));
 for (const [id, key] of [["ramp-step", "rampStep"], ["ramp-every", "rampEvery"], ["ramp-max", "rampMax"]]) {
   $(id).addEventListener("change", e => { S[key] = Math.max(1, +e.target.value || S[key]); e.target.value = S[key]; });
 }
-// Sound choices are a per-browser preference.
+// Practice settings (stop after, volumes) are a per-browser preference.
 const PREFS_KEY = "drums4all.prefs";
 try {
   const prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {};
-  if (prefs.kit) S.kit = prefs.kit;  // checked against the kit list once it loads
-  if (CLICKS[prefs.clickSound]) S.clickSound = prefs.clickSound;
   if (prefs.limit > 0 && prefs.limit <= 999) S.limit = prefs.limit;
   if (prefs.limitUnit === "min") S.limitUnit = "min";
+  for (const key of ["drumsVol", "clickVol"]) if (prefs[key] >= 0 && prefs[key] <= 150) S[key] = prefs[key];
 } catch { /* no storage: defaults */ }
 
 function savePrefs() {
-  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ kit: S.kit, clickSound: S.clickSound, limit: S.limit, limitUnit: S.limitUnit })); } catch { /* not kept */ }
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ limit: S.limit, limitUnit: S.limitUnit,
+    drumsVol: S.drumsVol, clickVol: S.clickVol })); } catch { /* not kept */ }
 }
 
-loadManifest().then(kits => {
-  if (!kits[S.kit]) S.kit = Object.keys(kits)[0];
-  $("kit").innerHTML = Object.entries(kits).map(([k, v]) => `<option value="${k}" title="${v.credit}">${v.name}</option>`).join("");
-  $("kit").value = S.kit;
-}).catch(e => setSaveStatus("couldn't load the kit list: " + e.message, true));
-$("click-sound").innerHTML = Object.entries(CLICKS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
-$("click-sound").value = S.clickSound;
 
 // Changing a sound plays a short preview when stopped.
 function preview(names) {
   if (S.playing) return;
   const bus = makeBus(R.ctx);
+  bus.drums.gain.value = names[0][0].startsWith("click") ? 0.8 * S.clickVol / 100 : S.drumsVol / 100;
   const t = R.ctx.currentTime + 0.05;
   names.forEach(([name, dt, vel]) => playSound(R.ctx, bus.drums, R.sounds, name, t + dt, vel));
 }
-$("kit").addEventListener("change", async e => {
-  S.kit = e.target.value;
-  savePrefs();
-  await loadSounds();
-  preview([["kick", 0, 1], ["hh_closed", 0, 0.8], ["hh_closed", 0.2, 0.7], ["snare", 0.4, 1], ["hh_closed", 0.4, 0.8],
-    ["hh_open", 0.6, 0.7], ["kick", 0.8, 1], ["crash", 0.8, 0.8]]);
-});
-$("click-sound").addEventListener("change", async e => {
-  S.clickSound = e.target.value;
-  savePrefs();
-  await loadSounds();
-  preview([["click_accent", 0, 1], ["click", 0.35, 1], ["click", 0.7, 1]]);
-});
+const KIT_PREVIEW = [["kick", 0, 1], ["hh_closed", 0, 0.8], ["hh_closed", 0.2, 0.7], ["snare", 0.4, 1],
+  ["hh_closed", 0.4, 0.8], ["hh_open", 0.6, 0.7], ["kick", 0.8, 1], ["crash", 0.8, 0.8]];
+const CLICK_PREVIEW = [["click_accent", 0, 1], ["click", 0.35, 1], ["click", 0.7, 1]];
+
+// Volume sliders; letting go plays a short preview when stopped.
+for (const [id, key, what, sample] of [["drums-vol", "drumsVol", "Drums", KIT_PREVIEW], ["click-vol", "clickVol", "Metronome", CLICK_PREVIEW]]) {
+  const el = $(id);
+  const show = () => { el.title = `${what} volume: ${S[key]}%`; };
+  el.value = S[key];
+  show();
+  el.addEventListener("input", () => { S[key] = +el.value; show(); applyVolumes(); });
+  el.addEventListener("change", async () => {
+    savePrefs();
+    el.blur();  // so Space plays again
+    await loadSounds();
+    preview(sample);
+  });
+}
 
 // Buttons keep focus after a click, and Space would then press them again.
 document.addEventListener("click", e => { const b = e.target.closest("button"); if (b) b.blur(); });
@@ -1583,8 +1559,9 @@ async function exportWav() {
   const total = bars.reduce((t, bar) => t + barDur(bar), 0);
   const c = new OfflineAudioContext(1, Math.ceil((total + 2) * sr), sr);
   const bus = makeBus(c);
-  bus.click.gain.value = S.click ? 0.8 : 0;
-  bus.drums.gain.value = S.drums ? 1 : 0;
+  const l = levels();
+  bus.click.gain.value = l.click;
+  bus.drums.gain.value = l.drums;
   let t = 0;
   for (const bar of bars) {
     const dur = barDur(bar);

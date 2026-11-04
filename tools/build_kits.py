@@ -1,9 +1,8 @@
-"""Build the sampled drum kits in static/kits/ from Hydrogen drumkits.
+"""Build the sampled drum kit in static/kits/ from a Hydrogen drumkit.
 
     python tools/build_kits.py <folder with the extracted kits>
 
-Needs ffmpeg and numpy. The folder must contain AVLDrumkits-BlackPearl-2023/, AVLDrumkits-BlondeBop/ (from the Hydrogen
-sound library on SourceForge) and GMRockKit/ (from the Hydrogen repo, data/drumkits/GMRockKit).
+Needs ffmpeg and numpy. The folder must contain GMRockKit/ (from the Hydrogen repo, data/drumkits/GMRockKit).
 
 For every sound four velocity layers are kept (ghost, soft, normal, accent). Each sound is
 normalized on its loudest layer, so the layers keep their natural dynamics, then scaled by a mix
@@ -27,38 +26,9 @@ MIX = {
     "crash": 0.6, "ride": 0.55, "ride_bell": 0.6, "tom_hi": 0.85, "tom_mid": 0.85, "tom_floor": 0.9,
 }
 
-AVL_LAYERS = ["2", "3", "4", "5"]
 GM_LAYERS = ["Soft", "Med", "Hard", "Hardest"]
 
 KITS = {
-    "pearl": {
-        "name": "Pearl (rock)",
-        "dir": "AVLDrumkits-BlackPearl-2023/AVLDrumkits-BlackPearl-2023",
-        "credit": "AVL Drumkits Black Pearl 2023 by Glen MacArthur, CC BY-SA",
-        "layers": AVL_LAYERS,
-        "sounds": {
-            "kick": "36-Pearl-22-Kick-{}", "snare": "38-Pearl-14-Snare-{}", "rim": "37-Pearl-14-SideStick-{}",
-            "hh_closed": "42-Sabian-13-HatClosed-{}", "hh_open": "46-Sabian-13-HatSemi-{}",
-            "hh_pedal": "44-Sabian-13-HatPedal-{}", "crash": "49-SabianAA-16-Crash-{}",
-            "ride": "51-SabianAAX-20-Ride-{}", "ride_bell": "53-SabianAAX-20-RideBell-{}",
-            "tom_hi": "45-Pearl-12-Tom-{}", "tom_mid": ("45-Pearl-12-Tom-{}", 0.84),
-            "tom_floor": "41-Pearl-16-FloorTom-{}",
-        },
-    },
-    "tama": {
-        "name": "Tama (jazz)",
-        "dir": "AVLDrumkits-BlondeBop/AVLDrumkits-BlondeBop",
-        "credit": "AVL Drumkits Blonde Bop by Glen MacArthur, CC BY-SA",
-        "layers": AVL_LAYERS,
-        "sounds": {
-            "kick": "36-TAMA-18-Kick-{}", "snare": "38-TAMA-13-Snare-{}", "rim": "37-TAMA-13-SideStick-{}",
-            "hh_closed": "42-Zildjian-13-HatClosed-{}", "hh_open": "46-Zildjian-13-HatSemi-{}",
-            "hh_pedal": "44-Zildjian-13-HatPedal-{}", "crash": "49-Paiste2002-16-Crash-{}",
-            "ride": "51-SabianAAX-20-RideTip-{}", "ride_bell": "53-SabianAAX-20-RideBell-{}",
-            "tom_hi": "45-TAMA-10-Tom-{}", "tom_mid": ("45-TAMA-10-Tom-{}", 0.84),
-            "tom_floor": "41-TAMA-14-FloorTom-{}",
-        },
-    },
     "gmrock": {
         "name": "GM Rock",
         "dir": "GMRockKit",
