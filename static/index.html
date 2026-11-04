@@ -63,7 +63,7 @@
   .sep { width: 1px; align-self: stretch; background: var(--bg1); }
   #play { min-width: 84px; font-weight: 700; background: var(--green); color: var(--bg-1); border-color: var(--green); }
   #play:hover { filter: brightness(1.08); }
-  #play.playing { background: var(--red); border-color: var(--red); color: var(--fg1); }
+  #pause.playing { background: var(--red); border-color: var(--red); color: var(--fg1); }
   #bpm { width: 58px; text-align: center; font: 700 18px var(--mono); color: var(--fg1); padding: 0 4px; }
   .unit { color: var(--quartz); font-size: 12px; }
   #beats { display: flex; gap: 7px; align-items: center; }
@@ -86,7 +86,7 @@
   #tabs { max-width: 240px; }
   #new { width: 76px; }  /* the options say where; the closed menu just says New */
   #title { width: 200px; }
-  #tempo { width: 62px; }
+  #tempo, #bar-tempo { width: 62px; }
   #save-status { color: var(--niagara-1); font-size: 12px; }
   #save-status.err { color: var(--red1); }
   #where { color: var(--niagara-1); font-size: 12px; }
@@ -131,6 +131,7 @@
   #hl-play { background: #f438411a; }
   #hl-cursor { border: 1px solid #565f73; }
   #play-line { position: absolute; pointer-events: none; display: none; width: 2px; margin-left: -1px; background: #f43841; }
+  #play-line.parked { opacity: .6; }
   #sheet-msg { color: #c73c3f; font-size: 12px; padding: 4px 12px; }
   .legend { border-top: 1px solid var(--bg1); padding: 6px 14px; color: var(--quartz); font-size: 12px; }
   .legend summary { cursor: pointer; color: var(--niagara-1); font-size: 11px; user-select: none; }
@@ -162,7 +163,9 @@
   <div class="brand">drums4all<span>/</span></div>
   <button id="t-menu" title="Show the tab and bar menus">☰ Menu</button>
   <div class="group">
-    <button id="play" title="Space">▶ Play</button>
+    <button id="play-start" title="Play from the beginning (or the start of the loop)">|◀ Start</button>
+    <button id="pause" title="Shift+Space: pause, and resume where it was">❚❚ Pause</button>
+    <button id="play" title="Space: play from the red line (the note you clicked, or where you paused)">▶ Here</button>
     <button data-bpm="-1" title="PgDn">−</button>
     <input id="bpm" type="number" min="20" max="300" value="80" aria-label="BPM">
     <button data-bpm="1" title="PgUp">+</button>
@@ -225,6 +228,8 @@
     <span class="label">bar</span>
     <label class="field">Time <select id="bar-time" title="Time signature of this bar"></select></label>
     <button id="time-all" title="Use this time signature in every bar">All bars</button>
+    <label class="field" title="Change the tempo from this bar on (empty = keep the tempo before)">Bar tempo
+      <input id="bar-tempo" type="number" min="20" max="300"></label>
     <label class="field">Subdivision
       <select id="subdiv" title="Grid of this bar">
         <option value="1">quarter notes</option>
@@ -329,6 +334,7 @@ HH|-x-x-x-x|x-x-x-x-|
 // Each bar has its own time signature and one step count shared by all its instruments; rests are "-".
 // bar.sticking (optional) has the same length: R, L, U (unison, both hands) or "-", from an "ST|" row.
 // song.beats/unit is the default (the "Time:" header).
+// bar.tempo (optional, never on the first bar) is a tempo change from that bar on, from a "BPM|" row.
 
 const REST = new Set("-.·_");
 const NOTE = new Set("oOxXgGfFbB");
@@ -373,7 +379,7 @@ function parse(text) {
   let block = null;
   let sig = null;  // time signature for the next blocks, set by "Time:" lines
   const newBlock = () => {
-    block = { rows: {}, ts: null, st: null, sig: sig || [song.beats, song.unit] };
+    block = { rows: {}, ts: null, st: null, bpm: null, sig: sig || [song.beats, song.unit] };
     blocks.push(block);
   };
   text.split("\n").forEach((raw, idx) => {
@@ -417,6 +423,18 @@ function parse(text) {
       return;
     }
 
+    // "BPM||120|": tempo changes, from the bar that has one on.
+    if (name.toUpperCase() === "BPM") {
+      if (!block) newBlock();
+      block.bpm = parts.map(p => {
+        if (!p.trim()) return null;
+        const v = +p.trim();
+        if (!Number.isInteger(v) || v < 20 || v > 300) throw new TabError(`invalid tempo '${p.trim()}' (20 to 300)`, n);
+        return v;
+      });
+      return;
+    }
+
     // "ST|RLRR|": sticking under the notes.
     if (name.toUpperCase() === "ST") {
       if (!block) newBlock();
@@ -446,8 +464,8 @@ function parse(text) {
 
   const used = new Set(blocks.flatMap(b => Object.keys(b.rows)));
   song.insts = ORDER.filter(i => BASE.includes(i) || used.has(i));
-  blocks.forEach(({ rows, ts, st, sig: blockSig }) => {
-    const count = Math.max(0, ...Object.values(rows).map(v => v.length), ts ? ts.length : 0, st ? st.length : 0);
+  blocks.forEach(({ rows, ts, st, bpm, sig: blockSig }) => {
+    const count = Math.max(0, ...Object.values(rows).map(v => v.length), ts ? ts.length : 0, st ? st.length : 0, bpm ? bpm.length : 0);
     for (let i = 0; i < count; i++) {
       const [beats, unit] = (ts && ts[i]) || blockSig;
       const lens = [...Object.values(rows), st || []].map(v => (v[i] || "").length).filter(Boolean);
@@ -457,11 +475,19 @@ function parse(text) {
       for (const inst of song.insts) notes[inst] = stretch((rows[inst] || [])[i] || "", steps);
       const bar = { steps, beats, unit, notes, lineBreak: i === 0 && song.bars.length > 0 };
       if (st && /[^-]/.test(st[i] || "")) bar.sticking = stretch(st[i], steps);
+      if (bpm && bpm[i]) bar.tempo = bpm[i];
       song.bars.push(bar);
     }
   });
   if (!song.bars.length) throw new TabError("no bars found (lines like 'S|o-o-|')");
+  firstTempo(song);
   return song;
+}
+
+// A tempo on the first bar is the tab's tempo.
+function firstTempo(song) {
+  const first = song.bars[0];
+  if (first && first.tempo) { song.tempo = first.tempo; delete first.tempo; }
 }
 
 // Spread a row onto a finer grid: "o-" on 4 steps -> "o---".
@@ -488,7 +514,7 @@ function serialize(song) {
   if (song.title) out.push(`Title: ${song.title}`);
   if (song.tempo) out.push(`Tempo: ${song.tempo}`);
   out.push(`Time: ${def}`);
-  const w = Math.max(2, ...song.insts.map(i => i.length));
+  const w = Math.max(song.bars.some(b => b.tempo) ? 3 : 2, ...song.insts.map(i => i.length));
   const blocks = [];
   song.bars.forEach((bar, i) => {
     if (i === 0 || bar.lineBreak) blocks.push([]);
@@ -498,6 +524,9 @@ function serialize(song) {
     out.push("");
     if (bars.some(b => sigOf(b) !== def)) {
       out.push("TS".padStart(w) + "|" + bars.map(b => sigOf(b).padEnd(b.steps)).join("|") + "|");
+    }
+    if (bars.some(b => b.tempo)) {
+      out.push("BPM".padStart(w) + "|" + bars.map(b => String(b.tempo || "").padEnd(b.steps)).join("|") + "|");
     }
     for (const inst of song.insts) out.push(inst.padStart(w) + "|" + bars.map(b => b.notes[inst]).join("|") + "|");
     if (bars.some(b => b.sticking)) {
@@ -625,13 +654,15 @@ function playSound(c, dest, sounds, name, t, vel) {
   return { src, g, t };
 }
 
-function scheduleBar(c, bus, sounds, bar, start, dur) {
+// `from`: skip what comes before it (starting in the middle of a bar).
+function scheduleBar(c, bus, sounds, bar, start, dur, from = start) {
   const events = [];
   for (const [inst, row] of Object.entries(bar.notes)) {
     [...row].forEach((ch, j) => {
       if (!NOTE.has(ch)) return;
       const [sound, vel, flam] = hitFor(inst, ch);
       const t = start + (j * dur) / bar.steps;
+      if (t < from - 1e-6) return;
       const hh = inst === "HH" || inst === "HF";
       if (flam) events.push([t - FLAM_GAP, sound, vel * 0.4, hh]);
       events.push([t, sound, vel, hh]);
@@ -650,9 +681,10 @@ function scheduleBar(c, bus, sounds, bar, start, dur) {
   }
 }
 
-function scheduleClicks(c, bus, sounds, start, dur, beats, sub) {
+function scheduleClicks(c, bus, sounds, start, dur, beats, sub, from = start) {
   const per = beats * sub;
   for (let i = 0; i < per; i++) {
+    if (start + (i * dur) / per < from - 1e-6) continue;
     const name = i === 0 ? "click_accent" : i % sub === 0 ? "click" : "click_sub";
     playSound(c, bus.click, sounds, name, start + (i * dur) / per, 1);
   }
@@ -676,14 +708,26 @@ const S = {
   limit: 0,     // stop after this many times / minutes, 0 = never
   limitUnit: "times",
 };
-const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, rep: 0, repsDone: false, timeUp: false, queue: [], endTime: null };
+const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, rep: 0, repsDone: false, timeUp: false, paused: null, offset: 0, counted: false, queue: [], endTime: null };
 const H = { undo: [], redo: [], mergeKey: null, mergeTime: 0 };
 
 const $ = id => document.getElementById(id);
 const editor = $("editor");
 
+// The tempo written for a bar: the last change at or before it, or the tab's Tempo.
+function writtenBpm(song, bi) {
+  for (let i = bi; i > 0; i--) if (song.bars[i].tempo) return song.bars[i].tempo;
+  return song.tempo || S.bpm;
+}
+
+// The BPM box is the practice speed for the tab's Tempo; tempo changes scale with it.
+function barBpm(song, bi) { return writtenBpm(song, bi) * S.bpm / (song.tempo || S.bpm); }
+
 // BPM counts quarter notes, so a 6/8 bar lasts 3 quarters.
-function barDur(bar) { return (bar.beats * (4 / bar.unit) * 60) / S.bpm; }
+function barDur(song, bi) {
+  const bar = song.bars[bi];
+  return (bar.beats * (4 / bar.unit) * 60) / barBpm(song, bi);
+}
 
 function playOrder() {
   const n = S.song.bars.length;
@@ -712,8 +756,11 @@ function applyVolumes() {
   R.bus.drums.gain.setTargetAtTime(l.drums, t, 0.01);
 }
 
-async function play() {
-  if (!S.song || !S.song.bars.length || S.playing || R.loading) return;
+// Start playing bar `idx` of the play order, `offset` (0..1) into it. `keep` carries on the
+// repeat count and loops (resuming after a pause).
+async function play(idx = 0, offset = 0, keep = null) {
+  if (!S.song || !S.song.bars.length || R.loading) return;
+  if (S.playing) stop();
   try {
     await loadSounds();
   } catch (e) {
@@ -724,10 +771,13 @@ async function play() {
   R.bus = makeBus(R.ctx);
   applyVolumes();
   R.nextStart = R.ctx.currentTime + 0.12;
-  R.nextIdx = 0;
+  R.nextIdx = idx;
+  R.offset = offset;
+  R.counted = S.countIn;
   R.countLeft = S.countIn ? 1 : 0;
-  R.loops = 0;
-  R.rep = 0;
+  R.loops = keep ? keep.loops : 0;
+  R.rep = keep ? keep.rep : 0;
+  R.paused = null;
   R.repsDone = false;
   R.timeUp = false;
   R.queue = [];
@@ -738,16 +788,54 @@ async function play() {
   renderControls();
 }
 
+// Where "Here" starts: the beat of the selected note, so the count-in and the click stay on the beat.
+function herePoint() {
+  const bar = curBar();
+  const per = bar.steps % bar.beats ? 1 : bar.steps / bar.beats;
+  return { idx: playOrder().indexOf(S.cur.bar), offset: Math.floor(S.cur.step / per) * per / bar.steps };
+}
+
+function playStart() { play(); }
+
+function playHere() {
+  if (S.textMode) return play();
+  const { idx, offset } = herePoint();
+  if (idx < 0) play();  // outside the loop: the loop's start
+  else play(idx, offset);
+}
+
+// Pause keeps the exact point and moves the red line (the selected note) there.
+function pause() {
+  const now = nowHeard();
+  stop();
+  if (!now || now.bar === null) return;
+  R.paused = { bar: now.bar, frac: now.frac, rep: now.rep, loops: R.loops };
+  const bar = S.song.bars[now.bar];
+  if (bar) {
+    S.cur.bar = now.bar;
+    S.cur.step = Math.min(bar.steps - 1, Math.floor(now.frac * bar.steps));
+    G.reveal = true;
+  }
+  renderControls();
+}
+
+function resume() {
+  const p = R.paused, idx = p ? playOrder().indexOf(p.bar) : -1;
+  if (idx < 0) playHere();
+  else play(idx, p.frac, p);
+}
+
 function stop(letRing = false) {
   clearInterval(R.timer);
   if (R.bus && !letRing) R.bus.limiter.disconnect();  // silences everything already scheduled
   R.bus = letRing ? R.bus : null;
   R.queue = [];
+  R.paused = null;
   S.playing = false;
   renderControls();
 }
 
-function togglePlay() { S.playing ? stop() : play(); }
+function togglePlay() { S.playing ? pause() : playHere(); }
 
 function tick() {
   const c = R.ctx;
@@ -757,8 +845,8 @@ function tick() {
     if (!order.length) { R.endTime = R.nextStart; break; }
     if (R.countLeft > 0) {
       // Count in with the time signature of the first bar that will play.
-      const first = song.bars[order[0]];
-      const dur = barDur(first);
+      const first = song.bars[order[R.nextIdx]];
+      const dur = barDur(song, order[R.nextIdx]);
       scheduleClicks(c, R.bus, R.sounds, R.nextStart, dur, first.beats, 1);
       R.queue.push({ bar: null, start: R.nextStart, dur, beats: first.beats, rep: 0 });
       R.countLeft--;
@@ -777,20 +865,34 @@ function tick() {
     }
     const bi = order[R.nextIdx++];
     const bar = song.bars[bi];
-    const dur = barDur(bar);
-    scheduleBar(c, R.bus, R.sounds, bar, R.nextStart, dur);
-    scheduleClicks(c, R.bus, R.sounds, R.nextStart, dur, bar.beats, S.sub);
-    R.queue.push({ bar: bi, start: R.nextStart, dur, beats: bar.beats, rep: R.rep });
-    R.nextStart += dur;
+    const dur = barDur(song, bi);
+    // Starting inside a bar: straight in from that point, or after a count-in the click plays the
+    // whole bar and the drums come in at that point.
+    let start = R.nextStart, from = start;
+    if (R.offset) {
+      if (R.counted) from = start + R.offset * dur;
+      else start -= R.offset * dur;
+      R.offset = 0;
+    }
+    scheduleBar(c, R.bus, R.sounds, bar, start, dur, from);
+    scheduleClicks(c, R.bus, R.sounds, start, dur, bar.beats, S.sub, R.counted ? start : from);
+    R.queue.push({ bar: bi, start, dur, beats: bar.beats, rep: R.rep });
+    R.nextStart = start + dur;
   }
 }
 
 // What is being heard right now (the output latency is compensated).
 function nowPlaying() {
   if (!S.playing) return null;
-  const c = R.ctx;
-  const heard = c.currentTime - (c.outputLatency || c.baseLatency || 0);
-  if (R.endTime !== null && heard > R.endTime) { stop(true); return null; }
+  if (R.endTime !== null && heardTime() > R.endTime) { stop(true); return null; }
+  return nowHeard();
+}
+
+function heardTime() { return R.ctx.currentTime - (R.ctx.outputLatency || R.ctx.baseLatency || 0); }
+
+function nowHeard() {
+  if (!S.playing) return null;
+  const heard = heardTime();
   while (R.queue.length > 1 && R.queue[0].start + R.queue[0].dur <= heard) R.queue.shift();
   const e = R.queue[0];
   if (!e || heard < e.start) return null;
@@ -814,11 +916,12 @@ function setSelection(sel) {
   renderControls();
 }
 
-const GRID_BUTTONS = ["bar-time", "time-all", "subdiv", "bar-add", "bar-dup", "bar-del", "bar-clear", "bar-break", "bar-copy", "bar-paste", "add-inst"];
+const GRID_BUTTONS = ["bar-time", "time-all", "bar-tempo", "subdiv", "bar-add", "bar-dup", "bar-del", "bar-clear", "bar-break", "bar-copy", "bar-paste", "add-inst"];
 
 function renderControls() {
-  $("play").textContent = S.playing ? "■ Stop" : "▶ Play";
-  $("play").classList.toggle("playing", S.playing);
+  $("pause").textContent = S.playing || !R.paused ? "❚❚ Pause" : "▷ Resume";
+  $("pause").classList.toggle("playing", S.playing);
+  $("pause").disabled = !S.playing && !R.paused;
   const flags = { "t-click": S.click, "t-drums": S.drums, "t-count": S.countIn, "t-loop": S.loop, "t-ramp": S.ramp };
   for (const [id, on] of Object.entries(flags)) {
     $(id).classList.toggle("on", on);
@@ -846,6 +949,10 @@ function renderControls() {
   timeSel.value = sigOf(bar);
   const per = bar.steps % bar.beats ? "" : String(bar.steps / bar.beats);
   $("subdiv").value = [...$("subdiv").options].some(o => o.value === per) ? per : "";
+  // The first bar's tempo is the tab's Tempo; other bars show the tempo they inherit.
+  setField("bar-tempo", bar.tempo || "");
+  $("bar-tempo").placeholder = S.cur.bar ? writtenBpm(song, S.cur.bar - 1) : song.tempo || "";
+  $("bar-tempo").disabled = S.textMode || S.cur.bar === 0;
   $("bar-break").classList.toggle("on", !!bar.lineBreak);
   $("bar-break").disabled = S.textMode || S.cur.bar === 0;
   $("bar-del").disabled = S.textMode || song.bars.length < 2;
@@ -878,7 +985,9 @@ const actions = {
 for (const name of Object.keys(actions)) {
   $("t-" + name).addEventListener("click", () => { actions[name](); renderControls(); });
 }
-$("play").addEventListener("click", togglePlay);
+$("play-start").addEventListener("click", playStart);
+$("pause").addEventListener("click", () => (S.playing ? pause() : resume()));
+$("play").addEventListener("click", playHere);
 document.querySelectorAll("[data-bpm]").forEach(b =>
   b.addEventListener("click", e => setBpm(S.bpm + +b.dataset.bpm * (e.shiftKey ? 5 : 1))));
 $("bpm").addEventListener("change", e => setBpm(e.target.value));
@@ -1085,6 +1194,16 @@ $("bar-time").addEventListener("change", e => {
   const [beats, unit] = parseTimeSig(e.target.value);
   edit(song => setTimeSig(song.bars[S.cur.bar], beats, unit));
 });
+$("bar-tempo").addEventListener("change", e => {
+  const v = Math.round(+e.target.value);
+  edit(song => {
+    const bar = song.bars[S.cur.bar];
+    // Empty, invalid or the same as before: no tempo change here.
+    if (v >= 20 && v <= 300 && v !== writtenBpm(song, S.cur.bar - 1)) bar.tempo = v;
+    else delete bar.tempo;
+  });
+  e.target.value = curBar().tempo || "";
+});
 $("time-all").addEventListener("click", () => {
   const { beats, unit } = curBar();
   edit(song => song.bars.forEach(bar => setTimeSig(bar, beats, unit)));
@@ -1139,7 +1258,9 @@ function deleteBar() {
     const [removed] = song.bars.splice(S.cur.bar, 1);
     const next = song.bars[S.cur.bar];
     if (removed.lineBreak && next && S.cur.bar > 0) next.lineBreak = true;
+    if (removed.tempo && next && !next.tempo) next.tempo = removed.tempo;
     if (song.bars[0]) song.bars[0].lineBreak = false;
+    firstTempo(song);
   });
 }
 
@@ -1264,7 +1385,8 @@ document.addEventListener("keydown", e => {
   if (e.altKey) return;
   const grid = !S.textMode && S.song;
   const k = e.key;
-  if (k === " ") togglePlay();
+  if (k === " " && e.shiftKey) S.playing ? pause() : resume();
+  else if (k === " ") togglePlay();
   else if (k === "PageUp") setBpm(S.bpm + (e.shiftKey ? 5 : 1));
   else if (k === "PageDown") setBpm(S.bpm - (e.shiftKey ? 5 : 1));
   else if (k === "Escape") { if (picker.classList.contains("show")) closePicker(); else if (S.selection) setSelection(null); }
@@ -1471,6 +1593,7 @@ async function openTab(id) {
     return;
   }
   lib.current = id;
+  R.paused = null;
   savedText = tab.text;
   H.undo = [];
   H.redo = [];
@@ -1570,16 +1693,17 @@ async function exportWav() {
   if (!S.song) return;
   await loadSounds();
   const sr = R.ctx.sampleRate;
-  const bars = playOrder().map(bi => S.song.bars[bi]);
-  const total = bars.reduce((t, bar) => t + barDur(bar), 0);
+  const order = playOrder();
+  const total = order.reduce((t, bi) => t + barDur(S.song, bi), 0);
   const c = new OfflineAudioContext(1, Math.ceil((total + 2) * sr), sr);
   const bus = makeBus(c);
   const l = levels();
   bus.click.gain.value = l.click;
   bus.drums.gain.value = l.drums;
   let t = 0;
-  for (const bar of bars) {
-    const dur = barDur(bar);
+  for (const bi of order) {
+    const bar = S.song.bars[bi];
+    const dur = barDur(S.song, bi);
     scheduleBar(c, bus, R.sounds, bar, t, dur);
     scheduleClicks(c, bus, R.sounds, t, dur, bar.beats, S.sub);
     t += dur;
@@ -1599,15 +1723,19 @@ const PPQ = 480;
 function buildMidi(song, bpm) {
   const events = [];  // [tick, order, bytes]; order puts note-offs before note-ons on the same tick
   const text = (type, str) => { const b = [...new TextEncoder().encode(str)]; return [0xff, type, ...varLen(b.length), ...b]; };
-  const us = Math.round(60e6 / bpm);
+  const tempo = (t, v) => {
+    const us = Math.round(60e6 / v);
+    events.push([t, 0, [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255]]);
+  };
   if (song.title) events.push([0, 0, text(0x03, song.title)]);
-  events.push([0, 0, [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255]]);
+  tempo(0, bpm);
   const note = (t, key, vel) => {
     events.push([Math.max(0, t), 2, [0x99, key, vel]]);
     events.push([Math.max(0, t) + PPQ / 8, 1, [0x89, key, 0]]);
   };
   let tick = 0, prev = null;
   for (const bar of song.bars) {
+    if (bar.tempo) tempo(tick, bar.tempo);
     if (sigOf(bar) !== prev) {
       events.push([tick, 0, [0xff, 0x58, 4, bar.beats, Math.log2(bar.unit), 24, 8]]);
       prev = sigOf(bar);
@@ -1665,7 +1793,7 @@ function encodeWav(buf) {
 const C = {
   label: "#95a99f", faint: "#3a3537", dim: "#52494e", accent: "#cc8c3c", note: "#96a6c8", ghost: "#9e95c7",
   cur: "#232323", sel: "#303540", step: "#453d41", play: "#f43841", cursorBar: "#1e1e1e", cursor: "#f4f4ff",
-  sig: "#96a6c8",
+  sig: "#96a6c8", parked: "#f4384199",
 };
 const CELL = 22, ROW_H = 24, PAD = 6, LABEL_W = 36, MARGIN = 10, NUM_H = 18, LINE_GAP = 14;
 const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono");
@@ -1752,9 +1880,13 @@ function drawBar(bi, x, y, insts, frac) {
   const num = String(bi + 1) + (sel ? " ⟲" : "");
   g.fillText(num, x + 4, y + NUM_H / 2);
   // Show the time signature where it changes, right after the bar number.
-  if (!prev || sigOf(prev) !== sigOf(bar)) {
-    g.fillStyle = C.sig;
-    g.fillText(sigOf(bar), x + 4 + g.measureText(num).width + 8, y + NUM_H / 2);
+  // Then the time signature and the tempo where they change.
+  let lx = x + 4 + g.measureText(num).width + 8;
+  g.fillStyle = C.sig;
+  for (const label of [(!prev || sigOf(prev) !== sigOf(bar)) && sigOf(bar), bar.tempo && "♩=" + bar.tempo]) {
+    if (!label) continue;
+    g.fillText(label, lx, y + NUM_H / 2);
+    lx += g.measureText(label).width + 8;
   }
   G.hits.push({ x, y, w: bw, h: NUM_H, bar: bi });
 
@@ -1803,6 +1935,13 @@ function drawBar(bi, x, y, insts, frac) {
     g.fillText(label, x + PAD + j * CELL + CELL / 2, rowsY + rowsH + ROW_H / 2);
   });
 
+  if (!S.playing && isCursorBar) {
+    // Stopped: a fainter red line where "Here" plays from.
+    const px = x + PAD + herePoint().offset * bar.steps * CELL;
+    g.strokeStyle = C.parked;
+    g.lineWidth = 2;
+    g.beginPath(); g.moveTo(px, rowsY); g.lineTo(px, rowsY + rowsH); g.stroke();
+  }
   if (frac !== null) {
     const px = x + PAD + frac * bar.steps * CELL + CELL / 2;
     g.strokeStyle = C.play;
@@ -1846,7 +1985,7 @@ const PITCH = { HF: 0, B: 1, FT: 2, S: 3, T2: 4, T1: 5, R: 6, HH: 7, C: 8 };
 const QCODE = [[4, "w"], [3, "hd"], [2, "h"], [1.5, "qd"], [1, "q"], [0.75, "8d"], [0.5, "8"], [0.375, "16d"],
   [0.25, "16"], [0.1875, "32d"], [0.125, "32"], [0.0625, "64"]];
 // Notes get extra room (SHEET_SPACING) and lines extra height (SYS_H) so the sheet is easy to read.
-const SYS_H = 125, SHEET_TOP = 30, TEMPO_PAD = 26, SHEET_SPACING = 1.6;
+const SYS_H = 125, SHEET_TOP = 30, TEMPO_PAD = 26, BRACKET_PAD = 18, SHEET_SPACING = 1.6;
 const sheetEl = $("sheet");
 let sheetBoxes = [];
 let sheetTimer = null;
@@ -1933,11 +2072,32 @@ function buildMeasure(song, bar) {
     return m;
   }
 
+  // From `start`, two beats whose hits all fall on the thirds of the pair (two triplet steps apart):
+  // the three steps (null = rest), or null when it is not that pattern.
+  function quarterTriplets(start) {
+    const third = (2 * p) / 3;
+    const hit = k => insts.some(i => NOTE.has(bar.notes[i][start + k]));
+    for (let k = 0; k < 2 * p; k++) if (k % third && hit(k)) return null;
+    const steps = [0, third, 2 * third].map(k => (hit(k) ? start + k : null));
+    return steps[1] !== null || steps[2] !== null ? steps : null;  // a hit only on the beat is a plain note
+  }
+
   {
     const tickables = [];
     let groupNotes = [];
+    const hitsOn = step => insts.filter(i => NOTE.has(bar.notes[i][step])).map(i => [i, bar.notes[i][step]]);
     for (let b = 0; b < beats; b++) {
-      const hitsAt = k => insts.filter(i => NOTE.has(bar.notes[i][b * p + k])).map(i => [i, bar.notes[i][b * p + k]]);
+      const pair = group === 1 && p % 3 === 0 && p !== base && b % 2 === 0 && b + 1 < beats && quarterTriplets(b * p);
+      if (pair) {
+        // Three even notes over two beats: quarter-note triplets, with a bracket like printed music.
+        const code = codeFor(beatQ);
+        const notes = pair.map(step => (step === null ? vfRest(code) : stick(vfNote(hitsOn(step), code), step)));
+        m.tuplets.push(new VF.Tuplet(notes, { num_notes: 3, notes_occupied: 2, bracketed: true, location: VF.Tuplet.LOCATION_TOP }));
+        tickables.push(...notes);
+        b++;
+        continue;
+      }
+      const hitsAt = k => hitsOn(b * p + k);
       const onsets = [];
       for (let k = 0; k < p; k++) if (hitsAt(k).length) onsets.push(k);
       const beatNotes = [];
@@ -2017,23 +2177,33 @@ function layoutSheet(song, width, spacing = 1) {
   return { systems, problems };
 }
 
+// Tempo marks and triplet brackets need room above the line (a tempo mark sits over the bracket).
+const hasTempoMark = (song, i) => song.bars[i].tempo || (i === 0 && song.tempo);
+const bracketed = it => it.m && it.m.tuplets.length;
+function systemPad(song, items) {
+  return (items.some(it => hasTempoMark(song, it.i)) ? TEMPO_PAD : 0) + (items.some(bracketed) ? BRACKET_PAD : 0);
+}
+
 function drawSheet(el, song, systems, width) {
   const renderer = new VF.Renderer(el, VF.Renderer.Backends.SVG);
-  // Room above the first line for the tempo mark.
-  const top = SHEET_TOP + (song.tempo && systems[0] && systems[0][0].i === 0 ? TEMPO_PAD : 0);
-  renderer.resize(width, top + systems.length * SYS_H);
+  const ys = [];
+  let bottom = SHEET_TOP;
+  for (const items of systems) { bottom += systemPad(song, items); ys.push(bottom - 10); bottom += SYS_H; }
+  renderer.resize(width, bottom);
   const ctx = renderer.getContext();
   const boxes = [], problems = [];
   systems.forEach((items, si) => {
     let x = 10;
-    const y = top - 10 + si * SYS_H;
+    const y = ys[si];
     items.forEach((it, k) => {
       const bar = song.bars[it.i], prev = song.bars[it.i - 1];
       const stave = new VF.Stave(x, y, it.w);
       if (k === 0) stave.addClef("percussion");
       if (!prev || sigOf(prev) !== sigOf(bar)) stave.addTimeSignature(sigOf(bar));
       if (k === 0 && it.i > 0) stave.setMeasure(it.i + 1);
-      if (it.i === 0 && song.tempo) stave.setTempo({ duration: "q", bpm: song.tempo }, -40);
+      if (hasTempoMark(song, it.i)) {
+        stave.setTempo({ duration: "q", bpm: bar.tempo || song.tempo }, bracketed(it) ? -40 - BRACKET_PAD : -40);
+      }
       if (it.i === song.bars.length - 1) stave.setEndBarType(VF.Barline.type.END);
       stave.setContext(ctx).draw();
       // Where each note sits, as [fraction of the bar, x], for the playhead.
@@ -2130,8 +2300,9 @@ async function exportPdf() {
   try {
     let idx = 0;
     for (let page = 0; idx < systems.length; page++) {
-      const room = (pageH - 2 * margin - (page === 0 ? titleH : 0)) / scale - SHEET_TOP - TEMPO_PAD;
-      const chunk = systems.slice(idx, idx + Math.max(1, Math.floor(room / SYS_H)));
+      let room = (pageH - 2 * margin - (page === 0 ? titleH : 0)) / scale - SHEET_TOP, n = 0;
+      while (idx + n < systems.length && (room -= SYS_H + systemPad(song, systems[idx + n])) >= 0) n++;
+      const chunk = systems.slice(idx, idx + Math.max(1, n));
       if (page > 0) doc.addPage();
       let y = margin;
       if (page === 0 && song.title) {
@@ -2176,12 +2347,18 @@ async function exportPdf() {
 }
 
 // The red line moves from note to note in step with what is heard.
-// While playing, the sheet scrolls down with the red line, like the grid does.
-let sheetFollowed = null;
+// The sheet scrolls to the bar being played, like the grid does, and when stopped to the bar
+// selected on the grid.
+let sheetFollowed = null, sheetCursor = null;
 function followSheet(playBar) {
-  if (playBar === sheetFollowed) return;
+  if (playBar !== null && playBar !== sheetFollowed) revealSheet(playBar);
+  else if (!S.playing && !S.textMode && S.cur.bar !== sheetCursor) revealSheet(S.cur.bar);
   sheetFollowed = playBar;
-  const box = sheetBoxes.find(b => b.bar === playBar);
+  sheetCursor = S.cur.bar;
+}
+
+function revealSheet(bar) {
+  const box = sheetBoxes.find(b => b.bar === bar);
   const pane = $("sheet-pane");
   if (!box || pane.scrollHeight <= pane.clientHeight) return;
   const top = sheetEl.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop + box.y;
@@ -2214,6 +2391,9 @@ sheetEl.addEventListener("click", e => {
   S.cur.bar = box.bar;
   S.cur.step = Math.min(S.cur.step, curBar().steps - 1);
   G.reveal = true;
+  // While playing, jump there once the bars already scheduled have played (about a bar).
+  const idx = playOrder().indexOf(box.bar);
+  if (S.playing && idx >= 0) R.nextIdx = idx;
   renderControls();
 });
 new ResizeObserver(renderSheetSoon).observe(sheetEl);
@@ -2283,7 +2463,11 @@ function frame() {
     drawGrid(now);
     const playBar = now && !now.count ? now.bar : null;
     placeBox($("hl-play"), sheetBoxes.find(b => b.bar === playBar));
-    placeLine($("play-line"), sheetBoxes.find(b => b.bar === playBar), playBar !== null ? now.frac : null);
+    // While stopped the line rests where "Here" plays from: the beat of the selected note.
+    const parked = !S.playing && !S.textMode;
+    placeLine($("play-line"), sheetBoxes.find(b => b.bar === (parked ? S.cur.bar : playBar)),
+      parked ? herePoint().offset : playBar !== null ? now.frac : null);
+    $("play-line").classList.toggle("parked", parked);
     followSheet(playBar);
     placeBox($("hl-cursor"), S.textMode ? null : sheetBoxes.find(b => b.bar === S.cur.bar));
 
@@ -2298,6 +2482,7 @@ function frame() {
     let status = R.loading ? "loading sounds…" : "stopped";
     if (now && now.count) status = "count-in…";
     else if (S.playing) status = "playing" + (playBar !== null ? ` · bar ${playBar + 1}` : "");
+    if (playBar !== null && S.song.bars.some(b => b.tempo)) status += ` · ♩=${Math.round(barBpm(S.song, playBar))}`;
     if (S.selection) {
       const [a, b] = S.selection;
       status += ` · loop ${a + 1}${b !== a ? "–" + (b + 1) : ""}`;

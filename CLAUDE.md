@@ -47,7 +47,15 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - `static/index.html`: the whole front end, one file, sections marked `// ------ name`:
   tab model (parse/serialize), sounds, scheduling, state, transport, controls, editing, note picker, keyboard,
   library (serverStore / localStore), exports (wav, MIDI, PDF), grid editor (canvas), sheet music (VexFlow), frame loop.
-- While playing, the sheet pane scrolls with the red line (`followSheet`), like the grid does (the user asked).
+- While playing, the sheet pane scrolls with the red line (`followSheet`), like the grid does; when stopped it
+  scrolls to the bar selected on the grid (`revealSheet`).
+- Transport is three buttons (the user asked): **Start** (`playStart`, from the beginning or the loop start),
+  **Pause/Resume** (`pause`/`resume`, Shift+Space; `R.paused` keeps the exact point plus rep/loops) and **Here**
+  (`playHere`, Space; from the beat of the selected note, `herePoint`). Space while playing pauses. Pause moves the
+  cursor to the paused note. While stopped a fainter red line (`parked`) marks where Here starts, on grid and sheet.
+  `play(idx, offset, keep)` can start inside a bar (`R.offset`): straight in without count-in, or after a count-in
+  the click plays the whole bar and the drums come in at the point (`from` in `scheduleBar`/`scheduleClicks`).
+  Clicking a bar on the sheet while playing jumps there after the bars already scheduled (`R.nextIdx`).
 - `static/examples/*.txt` + `examples.json` (list used by the static-site mode).
 - `static/kits/gmrock/<sound>-<0..3>.flac` + `kits.json`: the one sampled kit, 4 velocity layers (ghost, soft,
   normal, accent). Rebuild with `tools/build_kits.py <dir with GMRockKit/>` (ffmpeg + numpy). Source: Hydrogen
@@ -67,6 +75,11 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - Optional `ST|RLU-|` row: sticking (`bar.sticking`, same length as the bar), drawn as bold letters under the
   notes on the sheet/PDF. The grid shows it as an extra `ST` row (`gridRows`, `rowOf`, `setRow`); resample/
   time-signature/copy/paste/clear carry it.
+- Optional `BPM|90|  |120|` row: tempo changes (`bar.tempo`, never on bar 0; a value there becomes `song.tempo`).
+  A bar plays at the last change at or before it (`writtenBpm`), scaled by the BPM box: `barBpm = written × S.bpm /
+  song.tempo`, so slowing down / speed-up keep the proportions. Shown as `♩=N` in the grid, a tempo mark on the
+  sheet (lines with one get `TEMPO_PAD` room, `systemPad`), MIDI tempo events, the `Bar tempo` field, the status
+  while playing. Copy/dup don't carry it; deleting a bar moves its change to the next bar.
 - Model: each bar has its own `beats/unit` and one `steps` count shared by all instruments (`steps/beats` =
   subdivision: 2 eighths, 3 triplets, 4 sixteenths...). Rests are `-`. `serialize(parse(x))` must round-trip.
 - Symbols: `o x` hit, upper case accent, `g` ghost, `f` flam, `x` on S = rim, `o` on HH = open, `b` on R = bell.
@@ -77,7 +90,9 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - **Sheet music must look like drumtabs.app**: percussion clef, **one voice, all stems up** (bass drum in the same
   chord), **flat beams**, accented snare (`O`/`X`) drawn as **x notehead + `>`**, open hi-hat as **circled x**
   (`x3`), triplets marked with a **small italic "3"** next to the accent (VexFlow's Tuplet is created for the
-  timing but not drawn), tempo mark at the top, bar numbers at line starts. Positions: crash above the staff with a
+  timing but not drawn). Quarter-note triplets (in a triplet bar, two beats whose hits all fall every 2 steps, e.g.
+  `x-x-x-`) are drawn as 3 quarters with a **bracket "3"** like printed music (`quarterTriplets`; lines with a
+  bracket get `BRACKET_PAD` room and the tempo mark goes above it), tempo mark at the top, bar numbers at line starts. Positions: crash above the staff with a
   ledger line, hi-hat in the space above the staff, ride on the top line. Generous spacing (`SHEET_SPACING`, `SYS_H`),
   same on screen and in the PDF.
 - **Note entry**: click a cell → a picker menu with the notes for that instrument (no double-click / toggling).

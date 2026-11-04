@@ -49,14 +49,18 @@ to `http://<computer-ip>:8484`.
 - Grid on the left, sheet music on the right. Click a cell and pick the note (accent, ghost, flam, rim, open
   hi-hat…), or type it.
 - Sticking (`R`, `L`, `U` for both hands) under the notes.
-- Any time signature and subdivision per bar (a single 3/4 bar, triplets, 16ths…).
+- Any time signature and subdivision per bar (a single 3/4 bar, triplets, 16ths…), and tempo changes for songs
+  that speed up or slow down.
 - A real recorded drum kit, and a metronome with count-in, loop and automatic speed up, each with its own volume.
+- Three ways to play: **Start** from the beginning, **Here** from the note you clicked (`Space`), and
+  **Pause**/**Resume** to carry on exactly where you were (`Shift+Space`). While playing, click a bar on the sheet
+  music to jump to it.
 - Stop by itself after N times through the tab, or after N minutes.
 - Each tab remembers the BPM you last practised it at.
 - Export to PDF, MIDI, WAV and `.txt`.
 
 The tab and bar menus (New, Export, Time, Subdivision, Text…) are behind the **Menu** button, so normally you
-only see the notes. The legend under the grid opens with a click. Press `Space` to play or stop. Hover the
+only see the notes. The legend under the grid opens with a click. Press `Space` to play from the red line or pause. Hover the
 buttons to see their keyboard shortcuts.
 
 ## Tab format
@@ -72,7 +76,9 @@ HH|x-x-x-x-x-x-x-x-|
 
 One line per instrument (`C` crash, `R` ride, `HH` hi-hat, `HF` hi-hat pedal, `T1` `T2` toms, `S` snare,
 `FT` floor tom, `B` bass drum), `|` between bars, one character per step. `o`/`x` is a note, upper case is an
-accent, `g` ghost, `f` flam, `-` rest. Tabs copied from drumtabs.app can be pasted with the `Text` button.
+accent, `g` ghost, `f` flam, `-` rest. An optional `BPM|` line changes the tempo from a bar on (e.g.
+`BPM|   |   |120|`), or use **Bar tempo** in the menu. Tabs copied from drumtabs.app can be pasted with the
+`Text` button.
 
 ## Running it by hand
 
