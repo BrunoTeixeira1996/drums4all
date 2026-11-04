@@ -12,8 +12,8 @@ comments, examples and docs is in English**.
 - Don't touch the user's tabs in `tabs/` unless asked (it's their data and it's git-ignored). Back them up first if
   you must change them.
 - Keep the app working both **with the Flask server** and **as a static site** (any static host, tabs in
-  localStorage). The user does **not** want to publish it from this repo (no GitHub Pages workflow); the README
-  only explains how others can host their own copy.
+  localStorage). The user does **not** want to publish it from this repo (no GitHub Pages workflow) and the README
+  is kept short and simple, in the user's voice (why they made it, credits, how to run); no hosting/Pages section.
   Use relative URLs in the page (`static/...`, `api/tabs`), never absolute ones.
 
 ## Run and test
