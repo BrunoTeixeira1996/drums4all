@@ -676,7 +676,7 @@ const S = {
   limit: 0,     // stop after this many times / minutes, 0 = never
   limitUnit: "times",
 };
-const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, rep: 0, repsDone: false, queue: [], endTime: null };
+const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, rep: 0, repsDone: false, timeUp: false, queue: [], endTime: null };
 const H = { undo: [], redo: [], mergeKey: null, mergeTime: 0 };
 
 const $ = id => document.getElementById(id);
@@ -729,6 +729,7 @@ async function play() {
   R.loops = 0;
   R.rep = 0;
   R.repsDone = false;
+  R.timeUp = false;
   R.queue = [];
   R.endTime = null;
   S.playing = true;
@@ -768,6 +769,7 @@ function tick() {
       R.rep++;
       const reps = S.limitUnit === "times" ? S.limit : 0;
       if (reps && R.rep >= reps) { R.repsDone = true; R.endTime = R.nextStart; break; }
+      if (R.timeUp) { R.endTime = R.nextStart; break; }  // minutes are up: stop at the end of the tab
       if (!reps && !S.loop) { R.endTime = R.nextStart; break; }
       R.nextIdx = 0;
       R.loops++;
@@ -2204,7 +2206,8 @@ new ResizeObserver(renderSheetSoon).observe(sheetEl);
 // ---------------------------------------------------------------- stop after
 
 // "Stop after N times" counts passes through the tab (or the loop range); "N minutes" counts
-// only time spent playing, across stops, until it runs out or the setting changes.
+// only time spent playing, across stops, until it runs out or the setting changes; when it runs out
+// the tab (or loop range) plays to its end before stopping.
 const P = { played: 0, last: null, done: false };
 
 function clock(sec) {
@@ -2217,7 +2220,7 @@ function clock(sec) {
 function updateLimit(now) {
   const t = performance.now() / 1000;
   const inBars = now && !now.count;
-  if (S.playing && R.endTime === null && P.done) { P.done = false; P.played = 0; }  // started again
+  if (S.playing && R.endTime === null && !R.timeUp && P.done) { P.done = false; P.played = 0; }  // started again
   if (inBars && P.last !== null && !P.done) P.played += Math.min(1, t - P.last);  // a hidden tab pauses frames
   P.last = inBars ? t : null;
 
@@ -2226,14 +2229,14 @@ function updateLimit(now) {
     const left = S.limit * 60 - P.played;
     if (left <= 0 && !P.done) {
       P.done = true;
-      if (S.playing) R.endTime = R.nextStart;  // finish the bars already scheduled
+      if (S.playing) R.timeUp = true;  // play to the end of the tab (or loop), then stop
     }
     text = clock(Math.max(0, left)) + " left";
   } else if (S.limit) {
     if (R.repsDone && !S.playing) P.done = true;
     text = (inBars ? Math.max(1, S.limit - now.rep) : S.limit) + " left";  // the one playing counts
   }
-  if (P.done) text = "done";
+  if (P.done) text = S.playing && R.endTime === null ? "finishing" : "done";
   const el = $("limit-left");
   if (el.textContent !== text) el.textContent = text;
   el.classList.toggle("show", !!S.limit);

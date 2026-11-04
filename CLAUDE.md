@@ -41,7 +41,8 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
   + legend under the grid is a `<details>` closed by default: the user wants to see only the notes when zoomed in.
   Both start closed on every load.
 - "Stop after N [times|minutes]" is one control (the user found a separate timer + repeat counter confusing):
-  `S.limit`/`S.limitUnit`, countdown box `#limit-left`, code in the "stop after" section. The last BPM of each tab is kept per browser (`drums4all.bpm` in localStorage)
+  `S.limit`/`S.limitUnit`, countdown box `#limit-left`, code in the "stop after" section. When the minutes run
+  out it shows "finishing" and plays to the end of the tab/loop (`R.timeUp`), never cutting it mid-way. The last BPM of each tab is kept per browser (`drums4all.bpm` in localStorage)
   and restored when it opens; the file's `Tempo:` stays as written.
 - `static/index.html`: the whole front end, one file, sections marked `// ------ name`:
   tab model (parse/serialize), sounds, scheduling, state, transport, controls, editing, note picker, keyboard,
