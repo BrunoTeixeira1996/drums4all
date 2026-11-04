@@ -37,6 +37,9 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 - Front end: the tab menu groups tabs by folder (`<optgroup>`). The user did NOT want a folder field to move tabs:
   folders are made on disk; the UI only shows them and the `New` menu creates a tab with no folder or in an existing
   folder. Import goes to the open tab's folder.
+- The two toolbars (tab and bar menus) start hidden behind the header's `Menu` button (`body.menu`), and the hint
+  + legend under the grid is a `<details>` closed by default: the user wants to see only the notes when zoomed in.
+  Both start closed on every load.
 - "Stop after N [times|minutes]" is one control (the user found a separate timer + repeat counter confusing):
   `S.limit`/`S.limitUnit`, countdown box `#limit-left`, code in the "stop after" section. The last BPM of each tab is kept per browser (`drums4all.bpm` in localStorage)
   and restored when it opens; the file's `Tempo:` stays as written.

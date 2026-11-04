@@ -55,6 +55,7 @@
   }
   header { background: var(--bg-1); }
   .toolbar { padding: 6px 14px; }
+  body:not(.menu) .toolbar { display: none; }
   .brand { color: var(--niagara); font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
   .brand span { color: var(--quartz); font-weight: 400; }
   .group { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
@@ -131,7 +132,11 @@
   #hl-cursor { border: 1px solid #565f73; }
   #play-line { position: absolute; pointer-events: none; display: none; width: 2px; margin-left: -1px; background: #f43841; }
   #sheet-msg { color: #c73c3f; font-size: 12px; padding: 4px 12px; }
-  .legend { border-top: 1px solid var(--bg1); padding: 10px 14px 12px; color: var(--quartz); font-size: 12px; }
+  .legend { border-top: 1px solid var(--bg1); padding: 6px 14px; color: var(--quartz); font-size: 12px; }
+  .legend summary { cursor: pointer; color: var(--niagara-1); font-size: 11px; user-select: none; }
+  .legend summary:hover { color: var(--quartz); }
+  .legend[open] summary { margin-bottom: 8px; }
+  .legend .hint { display: block; padding: 0 0 10px; }
   .legend dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 14px; margin: 0 0 8px; }
   .legend div { display: flex; gap: 8px; }
   .legend dt { color: var(--niagara); min-width: 22px; }
@@ -155,6 +160,7 @@
 <body>
 <header>
   <div class="brand">drums4all<span>/</span></div>
+  <button id="t-menu" title="Show the tab and bar menus">☰ Menu</button>
   <div class="group">
     <button id="play" title="Space">▶ Play</button>
     <button data-bpm="-1" title="PgDn">−</button>
@@ -253,14 +259,15 @@
 
 <main>
   <section class="pane" id="grid-pane">
-    <div class="hint">Click a cell and pick a note · or type <kbd>o</kbd> <kbd>O</kbd> <kbd>x</kbd> <kbd>X</kbd> <kbd>g</kbd> <kbd>f</kbd> <kbd>b</kbd>,
-      <kbd>-</kbd>/<kbd>Del</kbd> clears, arrows move · sticking on the <b>ST</b> row: <kbd>r</kbd> <kbd>l</kbd> <kbd>u</kbd> · <b>Time</b> and <b>Subdivision</b> apply to the selected bar (e.g. one bar of 3/4, or triplets)
-      · click a bar number to loop it (<kbd>Shift</kbd> extends)</div>
     <div id="grid-wrap">
       <canvas id="grid" tabindex="0"></canvas>
       <div id="picker"></div>
     </div>
-    <div class="legend" id="legend">
+    <details class="legend" id="legend">
+      <summary>legend and keys</summary>
+      <div class="hint">Click a cell and pick a note · or type <kbd>o</kbd> <kbd>O</kbd> <kbd>x</kbd> <kbd>X</kbd> <kbd>g</kbd> <kbd>f</kbd> <kbd>b</kbd>,
+      <kbd>-</kbd>/<kbd>Del</kbd> clears, arrows move · sticking on the <b>ST</b> row: <kbd>r</kbd> <kbd>l</kbd> <kbd>u</kbd> · <b>Time</b> and <b>Subdivision</b> apply to the selected bar (e.g. one bar of 3/4, or triplets)
+      · click a bar number to loop it (<kbd>Shift</kbd> extends)</div>
       <h4>instruments</h4>
       <dl>
         <div><dt>C</dt><dd>crash</dd></div>
@@ -285,7 +292,7 @@
         <div><dt>b</dt><dd>on R: bell</dd></div>
         <div><dt>·</dt><dd>rest</dd></div>
       </dl>
-    </div>
+    </details>
     <div id="text-wrap">
       <textarea id="editor" spellcheck="false" autocomplete="off" aria-label="Tab as text"></textarea>
       <div id="error"></div>
@@ -874,6 +881,12 @@ document.querySelectorAll("[data-bpm]").forEach(b =>
   b.addEventListener("click", e => setBpm(S.bpm + +b.dataset.bpm * (e.shiftKey ? 5 : 1))));
 $("bpm").addEventListener("change", e => setBpm(e.target.value));
 $("clear-sel").addEventListener("click", () => setSelection(null));
+// The tab and bar menus start hidden, so the page shows just the grid and the sheet.
+$("t-menu").addEventListener("click", () => {
+  const open = document.body.classList.toggle("menu");
+  $("t-menu").classList.toggle("on", open);
+  $("t-menu").setAttribute("aria-pressed", open);
+});
 for (const [id, key] of [["ramp-step", "rampStep"], ["ramp-every", "rampEvery"], ["ramp-max", "rampMax"]]) {
   $(id).addEventListener("change", e => { S[key] = Math.max(1, +e.target.value || S[key]); e.target.value = S[key]; });
 }

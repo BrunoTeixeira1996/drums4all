@@ -55,7 +55,9 @@ to `http://<computer-ip>:8484`.
 - Each tab remembers the BPM you last practised it at.
 - Export to PDF, MIDI, WAV and `.txt`.
 
-Press `Space` to play or stop. Hover the buttons to see their keyboard shortcuts.
+The tab and bar menus (New, Export, Time, Subdivision, Text…) are behind the **Menu** button, so normally you
+only see the notes. The legend under the grid opens with a click. Press `Space` to play or stop. Hover the
+buttons to see their keyboard shortcuts.
 
 ## Tab format
 
