@@ -32,10 +32,13 @@ Convert PDFs with `pdftoppm` to look at them. Audio can't be heard in tests: che
 ## Layout
 
 - `app.py`: Flask. `/` serves `static/index.html`; `/api/tabs` lists/gets/creates/updates/deletes `tabs/*.txt`
-  and `tabs/<folder>/*.txt` (one folder level; ids are `slug` or `folder/slug`; `POST /api/tabs/<id>/move`
-  `{folder}` moves a tab, empty folders are removed). Atomic writes. Seeds `tabs/` from `static/examples/` when empty.
-- Front end: the tab menu groups tabs by folder (`<optgroup>`), the `folder` field moves the open tab, New/Import
-  create in the open tab's folder. The last BPM of each tab is kept per browser (`drums4all.bpm` in localStorage)
+  and `tabs/<folder>/*.txt` (one folder level; ids are `slug` or `folder/slug`; `POST` takes an optional `folder`;
+  empty folders are removed on delete). Atomic writes. Seeds `tabs/` from `static/examples/` when empty.
+- Front end: the tab menu groups tabs by folder (`<optgroup>`). The user did NOT want a folder field to move tabs:
+  folders are made on disk; the UI only shows them and the `New` menu creates a tab with no folder or in an existing
+  folder. Import goes to the open tab's folder.
+- "Stop after N [times|minutes]" is one control (the user found a separate timer + repeat counter confusing):
+  `S.limit`/`S.limitUnit`, countdown box `#limit-left`, code in the "stop after" section. The last BPM of each tab is kept per browser (`drums4all.bpm` in localStorage)
   and restored when it opens; the file's `Tempo:` stays as written.
 - `static/index.html`: the whole front end, one file, sections marked `// ------ name`:
   tab model (parse/serialize), sounds, scheduling, state, transport, controls, editing, note picker, keyboard,

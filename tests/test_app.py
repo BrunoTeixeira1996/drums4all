@@ -45,15 +45,13 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/tabs/exercises/singles").json["text"], "Title: Singles\nS|o-o-|\n")
         self.assertEqual(self.client.put("/api/tabs/exercises/singles", json={"text": "Title: Singles\n"}).status_code, 200)
 
-        # moving keeps the name, avoids clashes and removes the folder once empty
-        self.assertEqual(self.client.post("/api/tabs/rock/move", json={"folder": "grooves"}).json["id"], "grooves/rock")
-        self.assertEqual(self.client.post("/api/tabs/exercises/singles/move", json={"folder": ""}).json["id"], "singles")
+        # a folder is removed once its last tab is deleted
+        self.assertEqual(self.client.post("/api/tabs", json={"text": "Title: Singles\n", "folder": "exercises"}).json["id"],
+                         "exercises/singles-2")
+        self.assertEqual(self.client.delete("/api/tabs/exercises/singles").status_code, 204)
+        self.assertEqual(self.client.delete("/api/tabs/exercises/singles-2").status_code, 204)
         self.assertFalse((Path(self.tmp.name) / "exercises").exists())
-        self.client.post("/api/tabs", json={"text": "Title: Rock\n"})
-        self.assertEqual(self.client.post("/api/tabs/rock/move", json={"folder": "grooves"}).json["id"], "grooves/rock-2")
-
-        self.assertEqual(self.client.delete("/api/tabs/grooves/rock").status_code, 204)
-        self.assertEqual(self.client.post("/api/tabs/singles/move", json={"folder": "../x"}).status_code, 400)
+        self.assertEqual(self.client.post("/api/tabs", json={"text": "", "folder": "../x"}).status_code, 400)
         self.assertEqual(self.client.post("/api/tabs", json={"text": "", "folder": "a/b"}).status_code, 400)
         self.assertEqual(self.client.get("/api/tabs/a/b/c").status_code, 404)
         self.assertEqual(self.client.get("/api/tabs/../app").status_code, 404)

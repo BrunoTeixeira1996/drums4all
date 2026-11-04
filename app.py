@@ -161,22 +161,6 @@ def create_tab():
     return jsonify(tab_info(tab_id, text)), 201
 
 
-@app.post("/api/tabs/<path:tab_id>/move")
-def move_tab(tab_id):
-    """Put a tab in another folder ("" = no folder). Returns its new id."""
-    path = tab_path(tab_id)
-    if not path.exists():
-        abort(404)
-    folder = read_folder()
-    if folder == split_id(tab_id)[0]:
-        return jsonify(tab_info(tab_id, path.read_text(encoding="utf-8", errors="replace")))
-    new_id = free_id(folder, split_id(tab_id)[1])
-    (tabs_dir() / folder).mkdir(parents=True, exist_ok=True)
-    os.replace(path, tabs_dir() / f"{new_id}.txt")
-    remove_if_empty(path.parent)
-    return jsonify(tab_info(new_id, (tabs_dir() / f"{new_id}.txt").read_text(encoding="utf-8", errors="replace")))
-
-
 @app.delete("/api/tabs/<path:tab_id>")
 def delete_tab(tab_id):
     path = tab_path(tab_id)

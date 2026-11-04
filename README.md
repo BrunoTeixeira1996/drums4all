@@ -38,8 +38,8 @@ Then run the start file for your system:
 - Windows: `start.bat` (or double-click it)
 
 The first start takes a minute. Then the browser opens at <http://127.0.0.1:8484>. Keep that window open while
-you use it. Your tabs are saved as `.txt` files in the `tabs` folder (type a name in **folder** to put a
-tab in a sub-folder, e.g. `exercises`).
+you use it. Your tabs are saved as `.txt` files in the `tabs` folder. Sub-folders (e.g. `tabs/exercises`) show
+up as groups in the tab menu, and **New** can create a tab in one of them.
 
 To open it from a phone or another computer on the same network, start it with `./start.sh --host 0.0.0.0` and go
 to `http://<computer-ip>:8484`.
@@ -51,7 +51,7 @@ to `http://<computer-ip>:8484`.
 - Sticking (`R`, `L`, `U` for both hands) under the notes.
 - Any time signature and subdivision per bar (a single 3/4 bar, triplets, 16ths…).
 - Real recorded drum kits, and a metronome with count-in, loop and automatic speed up.
-- Repeat counter (play it N times and stop) and practice timer.
+- Stop by itself after N times through the tab, or after N minutes.
 - Each tab remembers the BPM you last practised it at.
 - Export to PDF, MIDI, WAV and `.txt`.
 

@@ -73,21 +73,17 @@
   #ramp-cfg { display: none; color: var(--quartz); font-size: 12px; gap: 4px; align-items: center; }
   #ramp-cfg.show { display: flex; }
   #ramp-cfg input { width: 48px; padding: 1px 4px; }
-  #practice { min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
-  #practice.left { color: var(--niagara); }
-  #practice.done { color: var(--red1); border-color: var(--red); }
-  #timer, #reps { width: 58px; text-align: center; }
-  #reps-left {
+  #limit { width: 64px; text-align: center; }
+  #limit-left {
     display: none; padding: 3px 8px; border: 1px solid var(--niagara-1); border-radius: 3px;
     color: var(--niagara); font-weight: 700; font-variant-numeric: tabular-nums;
   }
-  #reps-left.show { display: inline-block; }
-  #reps-left.done { color: var(--red1); border-color: var(--red); }
-  #today { color: var(--niagara-1); font-size: 12px; }
+  #limit-left.show { display: inline-block; }
+  #limit-left.done { color: var(--red1); border-color: var(--red); }
   #clear-sel { display: none; }
   #clear-sel.show { display: inline-block; }
   #tabs { max-width: 240px; }
-  #folder { width: 110px; }
+  #new { width: 76px; }  /* the options say where; the closed menu just says New */
   #title { width: 200px; }
   #tempo { width: 62px; }
   #save-status { color: var(--niagara-1); font-size: 12px; }
@@ -173,9 +169,6 @@
     <button id="t-drums" class="on" title="D">Drums</button>
     <button id="t-count" class="on" title="C">Count-in</button>
     <button id="t-loop" class="on" title="L">Loop</button>
-    <label class="field" title="Play the tab (or the loop range) this many times, then stop. Empty = no limit">×
-      <input id="reps" type="number" min="0" max="999" step="1" placeholder="∞"></label>
-    <span id="reps-left" title="Repetitions still to play, counting the one playing now"></span>
     <button id="t-ramp" title="R">Speed up</button>
     <span id="ramp-cfg">+<input id="ramp-step" type="number" min="1" max="20" value="2"> BPM every
       <input id="ramp-every" type="number" min="1" max="64" value="4"> loops up to
@@ -185,11 +178,12 @@
     <label class="field">kit <select id="kit" title="Drum sounds"></select></label>
     <label class="field">click <select id="click-sound" title="Metronome sound"></select></label>
   </div>
-  <div class="group">
-    <button id="practice" title="Time played in this session (click to reset)">0:00</button>
-    <label class="field">timer <input id="timer" type="number" min="0" max="600" step="1" placeholder="off"
-      title="Stop playing after this many minutes of practice (empty or 0 = off)"> min</label>
-    <span id="today" title="Time played today in this browser"></span>
+  <div class="group" title="Stop by itself after playing the tab (or the loop) this many times, or after this many minutes of playing. Empty = keep going">
+    <label class="field">stop after <input id="limit" type="number" min="0" max="999" step="1" placeholder="never"></label>
+    <select id="limit-unit" aria-label="Stop after: times or minutes">
+      <option value="times">times</option><option value="min">minutes</option>
+    </select>
+    <span id="limit-left"></span>
   </div>
   <div class="group">
     <span id="status">stopped</span>
@@ -201,10 +195,7 @@
   <div class="group">
     <span class="label">tab</span>
     <select id="tabs" aria-label="Saved tabs"></select>
-    <label class="field" title="Folder of this tab: type a name to move it there (empty = no folder)">folder
-      <input id="folder" list="folder-list" placeholder="none" autocomplete="off"></label>
-    <datalist id="folder-list"></datalist>
-    <button id="new" title="New tab in this folder">New</button>
+    <select id="new" title="Create a new tab" aria-label="New tab"></select>
     <button id="delete">Delete</button>
     <button id="import">Import .txt</button>
     <button id="export-txt">Export .txt</button>
@@ -702,10 +693,10 @@ const S = {
   cur: { bar: 0, row: 0, step: 0 },
   clipboard: null,
   kit: "pearl", clickSound: "beep",
-  timer: 0,     // minutes of practice before playback stops, 0 = off
-  reps: 0,      // times to play the tab or loop range before stopping, 0 = no limit
+  limit: 0,     // stop after this many times / minutes, 0 = never
+  limitUnit: "times",
 };
-const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, rep: 0, queue: [], endTime: null };
+const R = { ctx: null, sounds: null, bus: null, timer: null, nextStart: 0, nextIdx: 0, countLeft: 0, loops: 0, rep: 0, repsDone: false, queue: [], endTime: null };
 const H = { undo: [], redo: [], mergeKey: null, mergeTime: 0 };
 
 const $ = id => document.getElementById(id);
@@ -753,6 +744,7 @@ async function play() {
   R.countLeft = S.countIn ? 1 : 0;
   R.loops = 0;
   R.rep = 0;
+  R.repsDone = false;
   R.queue = [];
   R.endTime = null;
   S.playing = true;
@@ -790,7 +782,9 @@ function tick() {
     }
     if (R.nextIdx >= order.length) {
       R.rep++;
-      if (S.reps ? R.rep >= S.reps : !S.loop) { R.endTime = R.nextStart; break; }
+      const reps = S.limitUnit === "times" ? S.limit : 0;
+      if (reps && R.rep >= reps) { R.repsDone = true; R.endTime = R.nextStart; break; }
+      if (!reps && !S.loop) { R.endTime = R.nextStart; break; }
       R.nextIdx = 0;
       R.loops++;
       if (S.ramp && R.loops % S.rampEvery === 0 && S.bpm < S.rampMax) setBpm(Math.min(S.rampMax, S.bpm + S.rampStep));
@@ -906,25 +900,18 @@ $("clear-sel").addEventListener("click", () => setSelection(null));
 for (const [id, key] of [["ramp-step", "rampStep"], ["ramp-every", "rampEvery"], ["ramp-max", "rampMax"]]) {
   $(id).addEventListener("change", e => { S[key] = Math.max(1, +e.target.value || S[key]); e.target.value = S[key]; });
 }
-$("reps").addEventListener("change", e => {
-  S.reps = Math.max(0, Math.min(999, Math.round(+e.target.value) || 0));
-  e.target.value = S.reps || "";
-  if (!S.playing) R.rep = 0;  // clears a finished "done" 
-  savePrefs();
-});
 // Sound choices are a per-browser preference.
 const PREFS_KEY = "drums4all.prefs";
 try {
   const prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {};
   if (prefs.kit) S.kit = prefs.kit;  // checked against the kit list once it loads
   if (CLICKS[prefs.clickSound]) S.clickSound = prefs.clickSound;
-  if (prefs.timer > 0 && prefs.timer <= 600) S.timer = prefs.timer;
-  if (prefs.reps > 0 && prefs.reps <= 999) S.reps = prefs.reps;
+  if (prefs.limit > 0 && prefs.limit <= 999) S.limit = prefs.limit;
+  if (prefs.limitUnit === "min") S.limitUnit = "min";
 } catch { /* no storage: defaults */ }
-$("reps").value = S.reps || "";
 
 function savePrefs() {
-  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ kit: S.kit, clickSound: S.clickSound, timer: S.timer, reps: S.reps })); } catch { /* not kept */ }
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ kit: S.kit, clickSound: S.clickSound, limit: S.limit, limitUnit: S.limitUnit })); } catch { /* not kept */ }
 }
 
 loadManifest().then(kits => {
@@ -1326,8 +1313,6 @@ async function api(method, path = "", body) {
 
 function tabUrl(id) { return "/" + id.split("/").map(encodeURIComponent).join("/"); }
 const folderOf = id => (id.includes("/") ? id.slice(0, id.lastIndexOf("/")) : "");
-const nameOf = id => id.slice(id.lastIndexOf("/") + 1);
-const FOLDER_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u;  // same as app.py
 const byFolderTitle = (a, b) => a.folder.localeCompare(b.folder) || a.title.localeCompare(b.title);
 
 // The last BPM used on each tab, per browser.
@@ -1361,7 +1346,6 @@ const serverStore = {
   get: id => api("GET", tabUrl(id)),
   put: (id, text) => api("PUT", tabUrl(id), { text }),
   create: (text, folder) => api("POST", "", { text, folder }),
-  move: (id, folder) => api("POST", tabUrl(id) + "/move", { folder }),
   remove: id => api("DELETE", tabUrl(id)),
   // Last-chance save when the page is closed.
   flush(id, text) {
@@ -1405,15 +1389,6 @@ const localStore = {
     tabs[id] = text;
     this.write(tabs);
     return this.info(id, text);
-  },
-  async move(id, folder) {
-    const tabs = this.read();
-    if (folderOf(id) === folder) return this.info(id, tabs[id]);
-    const to = this.freeId(tabs, folder, nameOf(id));
-    tabs[to] = tabs[id];
-    delete tabs[id];
-    this.write(tabs);
-    return this.info(to, tabs[to]);
   },
   async remove(id) {
     const tabs = this.read();
@@ -1489,8 +1464,10 @@ function renderLibrary() {
     }
   }
   sel.value = lib.current;
-  $("folder-list").innerHTML = folders.filter(Boolean).map(f => `<option value="${f}">`).join("");
-  setField("folder", lib.current ? folderOf(lib.current) : "");
+  // "New" offers the tab list's own places: no folder, or one of the folders.
+  const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  $("new").innerHTML = `<option value="">New…</option><option value="/">New tab</option>` +
+    folders.filter(Boolean).map(f => `<option value="${esc(f)}">New tab in ${esc(f)}</option>`).join("");
 }
 
 async function openTab(id) {
@@ -1531,7 +1508,7 @@ async function openTab(id) {
   if (decodeURIComponent(location.hash.slice(1)) !== id) history.replaceState(null, "", "#" + tabUrl(id).slice(1));
 }
 
-// New and imported tabs go in the folder of the tab that is open.
+// Imported tabs go in the folder of the tab that is open; "New" says where.
 async function addTab(text, folder = lib.current ? folderOf(lib.current) : "") {
   await saveNow();
   try {
@@ -1545,30 +1522,12 @@ async function addTab(text, folder = lib.current ? folderOf(lib.current) : "") {
 }
 
 $("tabs").addEventListener("change", e => openTab(e.target.value));
-$("folder").addEventListener("change", async e => {
-  const folder = e.target.value.trim();
-  const id = lib.current;
-  if (!id || folder === folderOf(id)) { e.target.value = id ? folderOf(id) : ""; return; }
-  if (folder && !FOLDER_RE.test(folder)) {
-    setSaveStatus("folder names: letters, numbers, spaces, - and _", true);
-    e.target.value = folderOf(id);
-    return;
-  }
-  await saveNow();
-  try {
-    const tab = await store.move(id, folder);
-    lib.tabs = lib.tabs.filter(t => t.id !== id).concat(tab).sort(byFolderTitle);
-    lib.current = tab.id;
-    keepBpms(all => { if (id in all) { all[tab.id] = all[id]; delete all[id]; } });
-    history.replaceState(null, "", "#" + tabUrl(tab.id).slice(1));
-    renderLibrary();
-    setSaveStatus(folder ? `moved to ${folder}` : "moved out of the folder");
-  } catch (err) {
-    setSaveStatus("couldn't move: " + err.message, true);
-    e.target.value = folderOf(id);
-  }
+
+$("new").addEventListener("change", e => {
+  const where = e.target.value;
+  e.target.value = "";
+  if (where) addTab(TEMPLATE, where === "/" ? "" : where);
 });
-$("new").addEventListener("click", () => addTab(TEMPLATE));
 $("delete").addEventListener("click", async () => {
   const tab = lib.tabs.find(t => t.id === lib.current);
   if (!confirm(`Delete "${tab ? tab.title : lib.current}"?`)) return;
@@ -2252,29 +2211,11 @@ sheetEl.addEventListener("click", e => {
 });
 new ResizeObserver(renderSheetSoon).observe(sheetEl);
 
-// ---------------------------------------------------------------- practice time
+// ---------------------------------------------------------------- stop after
 
-// Only time spent playing counts. The session clock resets on click, the
-// countdown on reset or when the timer is changed or runs out, and the day
-// total is kept per browser.
-const PRACTICE_KEY = "drums4all.practice";
-const P = { session: 0, countdown: 0, today: 0, day: "", last: null, saved: 0, done: false };
-
-function dayKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-
-try {
-  const kept = JSON.parse(localStorage.getItem(PRACTICE_KEY)) || {};
-  if (kept.day === dayKey()) P.today = +kept.seconds || 0;
-} catch { /* no storage: start at zero */ }
-P.day = dayKey();
-
-function savePractice() {
-  P.saved = P.today;
-  try { localStorage.setItem(PRACTICE_KEY, JSON.stringify({ day: P.day, seconds: Math.floor(P.today) })); } catch { /* not kept */ }
-}
+// "Stop after N times" counts passes through the tab (or the loop range); "N minutes" counts
+// only time spent playing, across stops, until it runs out or the setting changes.
+const P = { played: 0, last: null, done: false };
 
 function clock(sec) {
   sec = Math.floor(sec);
@@ -2283,53 +2224,54 @@ function clock(sec) {
   return (h ? h + ":" : "") + mm + ":" + String(s).padStart(2, "0");
 }
 
-function updatePractice(now) {
+function updateLimit(now) {
   const t = performance.now() / 1000;
-  if (P.day !== dayKey()) { P.day = dayKey(); P.today = 0; savePractice(); }
-  if (now && !now.count && P.last !== null) {
-    const dt = Math.min(1, t - P.last);  // a hidden tab pauses the frame loop
-    P.session += dt;
-    if (!P.done) P.countdown += dt;
-    P.today += dt;
-    if (P.today - P.saved >= 5) savePractice();
-  }
-  P.last = now && !now.count ? t : null;
-  if (!S.playing && P.today !== P.saved) savePractice();
+  const inBars = now && !now.count;
+  if (S.playing && R.endTime === null && P.done) { P.done = false; P.played = 0; }  // started again
+  if (inBars && P.last !== null && !P.done) P.played += Math.min(1, t - P.last);  // a hidden tab pauses frames
+  P.last = inBars ? t : null;
 
-  const limit = S.timer * 60;
-  if (S.playing && R.endTime === null && P.done) { P.done = false; P.countdown = 0; }  // played again
-  if (limit && !P.done && P.countdown >= limit) {
-    P.countdown = limit;
-    P.done = true;
-    if (S.playing) R.endTime = R.nextStart;  // finish the bars already scheduled
+  let text = "";
+  if (S.limit && S.limitUnit === "min") {
+    const left = S.limit * 60 - P.played;
+    if (left <= 0 && !P.done) {
+      P.done = true;
+      if (S.playing) R.endTime = R.nextStart;  // finish the bars already scheduled
+    }
+    text = clock(Math.max(0, left)) + " left";
+  } else if (S.limit) {
+    if (R.repsDone && !S.playing) P.done = true;
+    text = (inBars ? Math.max(1, S.limit - now.rep) : S.limit) + " left";  // the one playing counts
   }
-
-  const btn = $("practice");
-  const text = limit ? clock(limit - P.countdown) + " left" : clock(P.session);
-  if (btn.textContent !== text) btn.textContent = text;
-  btn.classList.toggle("left", !!limit && !P.done);
-  btn.classList.toggle("done", P.done);
-  const today = "today " + clock(P.today);
-  if ($("today").textContent !== today) $("today").textContent = today;
+  if (P.done) text = "done";
+  const el = $("limit-left");
+  if (el.textContent !== text) el.textContent = text;
+  el.classList.toggle("show", !!S.limit);
+  el.classList.toggle("done", P.done);
 }
 
-$("practice").addEventListener("click", () => { P.session = 0; P.countdown = 0; P.done = false; });
-$("timer").value = S.timer || "";
-$("timer").addEventListener("change", e => {
-  S.timer = Math.max(0, Math.min(600, Math.round(+e.target.value) || 0));
-  e.target.value = S.timer || "";
-  P.countdown = 0;
+function limitChanged() {
+  P.played = 0;
   P.done = false;
+  R.repsDone = false;
   savePrefs();
+}
+
+$("limit").value = S.limit || "";
+$("limit-unit").value = S.limitUnit;
+$("limit").addEventListener("change", e => {
+  S.limit = Math.max(0, Math.min(999, Math.round(+e.target.value) || 0));
+  e.target.value = S.limit || "";
+  limitChanged();
 });
-addEventListener("pagehide", savePractice);
+$("limit-unit").addEventListener("change", e => { S.limitUnit = e.target.value; limitChanged(); });
 
 // ---------------------------------------------------------------- frame loop
 
 function frame() {
   if (S.song) {
     const now = nowPlaying();
-    updatePractice(now);
+    updateLimit(now);
     drawGrid(now);
     const playBar = now && !now.count ? now.bar : null;
     placeBox($("hl-play"), sheetBoxes.find(b => b.bar === playBar));
@@ -2344,20 +2286,9 @@ function frame() {
     }
     for (let i = 0; i < beats; i++) beatsEl.children[i].classList.toggle("lit", !!now && now.beat === i);
 
-    let status = R.loading ? "loading sounds…" : P.done ? "time's up" : "stopped";
+    let status = R.loading ? "loading sounds…" : "stopped";
     if (now && now.count) status = "count-in…";
     else if (S.playing) status = "playing" + (playBar !== null ? ` · bar ${playBar + 1}` : "");
-    if (now && !now.count && S.reps) status += ` · rep ${Math.min(now.rep + 1, S.reps)}/${S.reps}`;
-
-    // Repetitions left, counting down like the timer.
-    const repsEl = $("reps-left");
-    const finished = !S.playing && S.reps && R.rep >= S.reps;
-    let left = S.reps;
-    if (now && !now.count) left = Math.max(1, S.reps - now.rep);
-    const repsText = finished ? "done" : left + " left";
-    if (repsEl.textContent !== repsText) repsEl.textContent = repsText;
-    repsEl.classList.toggle("show", !!S.reps);
-    repsEl.classList.toggle("done", !!finished);
     if (S.selection) {
       const [a, b] = S.selection;
       status += ` · loop ${a + 1}${b !== a ? "–" + (b + 1) : ""}`;
